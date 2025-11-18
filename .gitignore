@@ -1,0 +1,35 @@
+# 1. Virtual Environments (MUST IGNORE)
+# Your specific environment folder:
+new_db_env/
+# Common environment names:
+venv/
+.venv/
+env/
+
+# 2. Python Compiled Files & Cache
+# Byte-compiled files:
+__pycache__/
+*.pyc
+
+# 3. Streamlit and Sensitive Files (CRUCIAL for Security)
+# Never push secrets or local config
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# 4. Data Storage & Models (Often large and temporary)
+# You generally shouldn't commit large data files or models unless using Git LFS.
+*.pkl
+*.pth
+*.h5
+*.sav
+data/processed/
+artifacts/
+.vscode/
+*.env
+
+# 5. IDE and OS Files
+.DS_Store      # macOS
+thumbs.db      # Windows
+.vscode/       # VS Code configuration
+.idea/         # PyCharm configuration
+Gas activities_csv/
