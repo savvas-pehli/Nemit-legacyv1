@@ -3,6 +3,5 @@ pandas
 plotly
 polars
 Shapely
-streamlit
 duckdb
 python-dotenv
