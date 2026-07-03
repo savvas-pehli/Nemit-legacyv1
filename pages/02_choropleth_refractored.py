@@ -1,15 +1,13 @@
 import streamlit as st
-import pandas as pd
 from utils.db_conn import get_db_connection, fetch_query, quote
 from utils.translation_helper import greek_to_latin
-from data.sql_queries import CHOROPLETH_YEARLY_QUERY, GET_CHORO_GAS_COLUMNS_QUERY,CHOROPLETH_HOURLY_YEARLY_QUERY
+from queries.sql_queries import CHOROPLETH_YEARLY_QUERY, GET_CHORO_GAS_COLUMNS_QUERY,CHOROPLETH_HOURLY_YEARLY_QUERY
 from utils.processing import (
     hourly_df_with_polars,
     yearly_df_with_polars_from_raw
 )
 from utils.plotting import choropleth_mapbox
 from utils.geo import load_geo_original_data  # to be added
-import time
 # Connect to DB
 conn = get_db_connection()
 
@@ -22,7 +20,7 @@ region = st.selectbox("Please select Region:", ["Attica", "Central Macedonia"])
 # Timeframe logic mapping
 timeframe_options = {
     "Yearly timeframe": {
-        "frame": "year",
+        "frame": "Year",
         "processor": lambda df, col, _: yearly_df_with_polars_from_raw(df, col)
     },
     "Last five years hours": {
@@ -33,15 +31,15 @@ timeframe_options = {
         "frame": "Hour",
         "processor": lambda df, col, year: hourly_df_with_polars(df, col, "Certain year hours", year)
     }
-}
+} 
 
 # User selects timeframe
 selected_timeframe = st.sidebar.selectbox("Please choose timeframe", list(timeframe_options.keys()))
 
 # Column (air pollutant) selection
 column_query = GET_CHORO_GAS_COLUMNS_QUERY
-cols_result = fetch_query(conn, column_query)
-columns = cols_result['COLUMN_NAME'].tolist() if cols_result is not None else []
+cols_result = fetch_query(conn, column_query) 
+columns = cols_result['column_name'].tolist() if cols_result is not None else []
 selected_col = st.selectbox("Please select air pollutant", sorted(columns))
 # Geo data
 
@@ -65,7 +63,7 @@ if selected_timeframe == "Certain year hours" and gdf is not None:
     region=quote(region)
 )
     gdf = fetch_query(conn, query)
-    year_list = sorted([int(year) for year in gdf['year'].unique()])
+    year_list = sorted([int(year) for year in gdf['Year'].unique()])
     year_input = st.sidebar.selectbox("Choose year", year_list)
 
 if gdf is not None and (selected_timeframe != "Certain year hours" or year_input):

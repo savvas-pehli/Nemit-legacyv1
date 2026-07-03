@@ -1,6 +1,6 @@
 # 1. Virtual Environments (MUST IGNORE)
 # Your specific environment folder:
-new_db_env/
+.nemit_venv/
 # Common environment names:
 venv/
 .venv/
@@ -22,14 +22,20 @@ __pycache__/
 *.pth
 *.h5
 *.sav
-data/processed/
+data/
 artifacts/
 .vscode/
 *.env
-
+*.sql
+init_db.py
+Requesting script.py
+testing.py
 # 5. IDE and OS Files
 .DS_Store      # macOS
 thumbs.db      # Windows
 .vscode/       # VS Code configuration
 .idea/         # PyCharm configuration
 Gas activities_csv/
+nemit blog files/
+Preprocessing_tools
+test_files/

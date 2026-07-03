@@ -15,7 +15,7 @@ def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
             axis=1)
     else:
         gdf["tooltip_data"] = gdf.apply(
-            lambda row: f"Year: {row['year']}<br>Municipality of {row['municipality']}<br>Air Pollutant: {pollutant_name}<br>Value of air pollutant in {measurement_unit}: {row['tooltip_label']}",
+            lambda row: f"Year: {row['Year']}<br>Municipality of {row['municipality']}<br>Air Pollutant: {pollutant_name}<br>Value of air pollutant in {measurement_unit}: {row['tooltip_label']}",
             axis=1)
 
 

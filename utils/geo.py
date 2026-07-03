@@ -1,7 +1,6 @@
 import pandas as pd
 import geopandas as gpd 
 from shapely import wkt
-from functools import lru_cache
 import streamlit as st
 from utils.translation_helper import greek_to_latin
 

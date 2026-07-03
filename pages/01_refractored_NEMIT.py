@@ -1,8 +1,13 @@
 import streamlit as st
-import psutil as ps
+import os
+import sys
+import numpy as np
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from utils.db_conn import get_db_connection, fetch_query, format_in_clause
 from utils.processing import has_stepsize_one
-from data.sql_queries import (
+from queries.sql_queries import (
     GET_REGIONS_QUERY,
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,GET_ALL_STATIONS_QUERY,
@@ -12,7 +17,6 @@ from data.sql_queries import (
 )
 from utils.plotting import dynamic_groupby_bar_chart
 import polars as pl
-import time
 
 conn = get_db_connection()
 st.set_page_config(layout="wide", page_title="Pollution Data Dashboard")
@@ -21,7 +25,6 @@ st.sidebar.title('Time and gas filters')
 # Region and Station Selection
 regions = fetch_query(conn, GET_REGIONS_QUERY)['region'].tolist()
 selected_regions = st.multiselect("Please select Region/s:", sorted(regions))
-
 if selected_regions:
     region_clause = format_in_clause(selected_regions)
     station_query = GET_STATIONS_BY_REGIONS_QUERY.format(regions=region_clause)
@@ -35,7 +38,7 @@ selected_stations = st.multiselect("Please select Station/s:", sorted(stations),
 
 # Common Year Selection
 if selected_stations:
-    station_clause = format_in_clause(selected_stations)
+    station_clause = format_in_clause([station.upper() for station in selected_stations])
     year_query = GET_COMMON_YEARS_FOR_STATIONS.format(
         stations=station_clause,
         station_count=len(selected_stations)
@@ -47,10 +50,10 @@ else:
     
 
 if common_years:
-    if has_stepsize_one(common_years) and len(common_years) > 1:
+    if has_stepsize_one(np.sort(common_years)) and len(common_years) > 1:
         year_range = st.sidebar.slider("Year Range", min(common_years), max(common_years), (min(common_years), max(common_years)))
     else:
-        year_range = st.sidebar.multiselect("Select Years", common_years)
+        year_range = st.sidebar.multiselect("Select Years", common_years.sort())
 else:
     year_range = st.sidebar.slider("Year Range", 2001, 2022, (2001, 2022))
     
@@ -76,14 +79,13 @@ agg_method = st.sidebar.selectbox("Aggregation Method", ["Mean", "Median"])
 timeframe = st.sidebar.selectbox("Timeframe", ["Year", "Month", "Day", "Hour"])
 
 # Gas Pollutant Selection
-gas_columns = fetch_query(conn, GET_GAS_COLUMNS_QUERY)['COLUMN_NAME'].tolist()
+gas_columns = fetch_query(conn, GET_GAS_COLUMNS_QUERY)['column_name'].tolist()
 selected_gases = st.sidebar.multiselect("Select Air Pollutants", gas_columns, max_selections=2)
 
 
 # Query Construction and Execution
 if st.button("Run Query") and selected_stations and selected_gases and year_range:
-    start_1=time.time()
-    columns = ', '.join([f'`{col}`' for col in ['record_datetime', 'Station'] + selected_gases])
+    columns = ', '.join([f'"{col}"' for col in ['record_datetime', 'Station'] + selected_gases])
     if isinstance(year_range, tuple):
         year_condition = f"Year BETWEEN {year_range[0]} AND {year_range[1]}"
     else:
@@ -98,11 +100,9 @@ if st.button("Run Query") and selected_stations and selected_gases and year_rang
         dow_start=day_range[0],
         dow_end=day_range[1]
     )
-    
     df = fetch_query(conn, data_query)
     if isinstance(selected_gases, str):
         selected_gases = [selected_gases]
-    end_1=time.time()
 # Check if any of the selected columns have at least one non-null value
     has_value = df[selected_gases].notna().any().any()
 
@@ -126,11 +126,11 @@ if st.button("Run Query") and selected_stations and selected_gases and year_rang
         }
         grouped = pl_df.group_by(["Station", group_timeframe[timeframe]]).agg(group_method[agg_method])
         grouped_df = grouped.to_pandas()
-        st.dataframe(grouped_df)
+        #st.dataframe(grouped_df)
 
         # Plotting
         st.success("Data Loaded Successfully")
-        #dynamic_groupby_bar_chart(grouped_df, selected_gases, timeframe)
+        dynamic_groupby_bar_chart(grouped_df, selected_gases, timeframe)
     else:
         st.warning("No data found for the selected filter combination.")
 else:

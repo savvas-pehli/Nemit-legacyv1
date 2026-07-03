@@ -1,40 +1,44 @@
 import streamlit as st
-#import pandas as pd
 import numpy as np
-#import datetime as dt
-import polars as pl
-#from itertools import chain
-#import altair as alt
 import plotly.express as px
-from utils.db_conn import get_db_connection, fetch_query
-from data.sql_queries import (AIR_POL_QUERY,
+from utils.db_conn import get_db_connection, fetch_query,format_in_clause
+from queries.sql_queries import (AIR_POL_QUERY,
                               MAIN_ECON_ACTIVITY,
                               SUB_ECON_QUERY,
                               ECON_ACTIVITY_QUERY)
 
 # Page setup
-st.set_page_config(page_title="Plotting Demo", page_icon="📈")
+st.set_page_config(layout="wide",page_title="Economic activity Pollution Data Dashboard", page_icon="📈")
 
-st.markdown("# Plotting Demo")
+st.markdown("# Economic activity Pollution Data Dashboard")
 st.sidebar.header("Plotting Demo")
 
 # Database connection
 conn=get_db_connection()
-st.set_page_config(layout="wide", page_title="Economic activity Pollution Data Dashboard")
 st.sidebar.title('Time and gas filters')
 
 # Always show year slider
-year_query = """SELECT DISTINCT(`Year`) FROM gas_econ_activity;"""
-year_list = list(fetch_query(conn,year_query)['Year'])
-years_selected = st.sidebar.select_slider('Choose year range', options=year_list, value=(min(year_list), max(year_list)))
+year_query = """SELECT DISTINCT(Year) as Year FROM gas_econ_activity;"""
+year_df = fetch_query(conn, year_query)
+if year_df is not None and not year_df.empty:
+    year_list = list(year_df["Year"])
+    years_selected = st.sidebar.select_slider(
+        'Choose year range', 
+        options=np.sort(year_list), 
+        value=(min(year_list), max(year_list))
+    )
+else:
+    st.error("Failed to load years from database.")
+    st.stop()
+    
 
 # Always show air pollutant selector
 air_pol_list=fetch_query(conn, AIR_POL_QUERY)
-air_pollutant = st.sidebar.selectbox('Please select one air pollutant', options=list(air_pol_list['COLUMN_NAME']))
+air_pollutant = st.sidebar.selectbox('Please select one air pollutant', options=list(air_pol_list['column_name']))
 
 # Main economic activity selection
 econ_activity_list=fetch_query(conn,MAIN_ECON_ACTIVITY)
-econ_act = st.multiselect('Please select economic activity', options=list(econ_activity_list['economic activity']), max_selections=5)
+econ_act = st.multiselect('Please select economic activity', options=np.sort(list(econ_activity_list['economic activity'])), max_selections=5)
 
 # Info and checkbox logic
 st.markdown('In case you want to further investigate the aspects of each main economic activity, please check the checkbox in order to activate the selection of sub-economic activities.')
@@ -47,13 +51,12 @@ if len(econ_act) == 1:
 
     if enable_sub_selection:
         code_name = list(econ_activity_list[econ_activity_list['economic activity'].isin(econ_act)]['code name'])
-        code_name_join = ''.join(code_name)
-        sub_econ_query=SUB_ECON_QUERY.format(code_name_join=code_name_join)
+        code_name_regex = f"{'|'.join(code_name)}"
+        sub_econ_query=SUB_ECON_QUERY.format(code_name_regex=code_name_regex)
         sub_list = fetch_query(conn,sub_econ_query)
-
         sub_econ_act = st.multiselect(
             'Please select sub-economic activities',
-            options=list(sub_list['economic activity']),
+            options=np.sort(list(sub_list['economic activity'])),
             max_selections=5
         )
 
@@ -62,8 +65,7 @@ elif len(econ_act) > 1:
 
 # Final list of activities
 all_activities = econ_act + sub_econ_act
-econ_act_query = f"({', '.join(f'\'{s}\'' for s in all_activities)})" if all_activities else None
-
+econ_act_query = format_in_clause(all_activities) if all_activities else None
 # Button to trigger query
 run_query = st.button("Run Query")
 # Only run query if required inputs are present
@@ -76,7 +78,7 @@ if run_query:
         data_query=ECON_ACTIVITY_QUERY.format(air_pollutant=air_pollutant,econ_act_query=econ_act_query,start=min(years_selected),end=max(years_selected))
         filtered_df = fetch_query(conn,data_query)
 
-        if filtered_df.empty:
+        if filtered_df.empty or filtered_df is None:
             st.warning("No data available for the selected options.")
         else:
             fig = px.line(

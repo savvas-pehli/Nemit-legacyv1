@@ -1,9 +1,8 @@
 import streamlit as st
-import psutil as ps
-import numpy as np
+#import psutil as ps
 from utils.db_conn import get_db_connection, fetch_query, format_in_clause
 from utils.processing import check_region,check_prefecture
-from data.sql_queries import (
+from queries.sql_queries import (
     GET_FUEL_REGIONS_QUERY,
     GET_FUEL_PREFECTURES_BY_REGIONS_QUERY,GET_ALL_FUEL_PREFECTURES_QUERY,
     GET_FUEL_COLUMNS_QUERY,
@@ -12,8 +11,6 @@ from data.sql_queries import (
     #CHECK_GAS_VALIDITY
 )
 from utils.plotting import fuel_con_groupby_bar_chart
-import polars as pl
-import time
 
 
 conn = get_db_connection()
@@ -53,7 +50,7 @@ prefecture_check=st.checkbox(
 )
 
 # Fuel type selection
-fuel_columns = fetch_query(conn, GET_FUEL_COLUMNS_QUERY)['COLUMN_NAME'].tolist()
+fuel_columns = fetch_query(conn, GET_FUEL_COLUMNS_QUERY)['column_name'].tolist()
 selected_fuels = st.sidebar.multiselect("Select Fuel Types", fuel_columns, max_selections=2)
 
 #timeline
@@ -83,8 +80,7 @@ prefectural_check=(st.session_state.prefecture_checked and selected_prefectures)
 if regional_check or prefectural_check:
     
     if st.button("Run Query") and selected_fuels:
-        st.write(table_name)
-        columns = ', '.join([f'`{col}`' for col in ['Year', main_column] + selected_fuels])
+        columns = ', '.join([f'"{col}"' for col in ['Year', main_column] + selected_fuels])
         main_col_values=format_in_clause(main_col_values)
         data_query = GET_FUEL_DATA.format(
         columns=columns,
