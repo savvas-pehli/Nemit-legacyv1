@@ -12,19 +12,28 @@ from queries.sql_queries import (
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,GET_ALL_STATIONS_QUERY,
     GET_GAS_COLUMNS_QUERY,
-    GET_AIR_POLLUTION_DATA
+    GET_AGGREGATTED_DATA,
+    #GET_AIR_POLLUTION_DATA
     #CHECK_GAS_VALIDITY
 )
 from utils.plotting import dynamic_groupby_bar_chart
-import polars as pl
+import pandas as pd
 
 conn = get_db_connection()
 st.set_page_config(layout="wide", page_title="Pollution Data Dashboard")
 st.sidebar.title('Time and gas filters')
 
 # Region and Station Selection
-regions = fetch_query(conn, GET_REGIONS_QUERY)['region'].tolist()
-selected_regions = st.multiselect("Please select Region/s:", sorted(regions))
+regions_df = pd.DataFrame(fetch_query(conn, GET_REGIONS_QUERY)['region'])
+if regions_df is not None and not regions_df.empty:
+    # 3. Use the EXACT casing that exists in your database
+    # Check if your DB uses 'region' or 'Region'
+    regions = regions_df['region'].tolist() 
+    selected_regions = st.multiselect("Please select Region/s:", sorted(regions))
+else:
+    st.error("⚠️ Connection lost or no regions found. Please refresh the page.")
+    st.stop() # Halts the script safely instead of throwing a red error screen
+    
 if selected_regions:
     region_clause = format_in_clause(selected_regions)
     station_query = GET_STATIONS_BY_REGIONS_QUERY.format(regions=region_clause)
@@ -85,14 +94,31 @@ selected_gases = st.sidebar.multiselect("Select Air Pollutants", gas_columns, ma
 
 # Query Construction and Execution
 if st.button("Run Query") and selected_stations and selected_gases and year_range:
-    columns = ', '.join([f'"{col}"' for col in ['record_datetime', 'Station'] + selected_gases])
     if isinstance(year_range, tuple):
         year_condition = f"Year BETWEEN {year_range[0]} AND {year_range[1]}"
     else:
         year_condition = f"Year IN ({', '.join(map(str, year_range))})"
 
-    data_query = GET_AIR_POLLUTION_DATA.format(
-        columns=columns,
+    
+    sql_timeframe = {
+        "Year": "EXTRACT(YEAR FROM record_datetime)",
+        "Month": "EXTRACT(MONTH FROM record_datetime)",
+        "Day": "EXTRACT(ISODOW FROM record_datetime)", # 1=Monday, 7=Sunday 
+        "Hour": "EXTRACT(HOUR FROM record_datetime)"
+    }
+    
+    sql_agg = {
+        "Mean": "AVG",
+        "Median": "MEDIAN"
+    }    
+    
+    timeframe_expr = sql_timeframe[timeframe]
+    gas_aggs = ', '.join([f'{sql_agg[agg_method]}("{gas}") AS "{gas}"' for gas in selected_gases])
+    
+    
+    data_query = GET_AGGREGATTED_DATA.format(
+        timeframe=timeframe_expr,
+        gas=gas_aggs,
         stations=station_clause,
         year_condition=year_condition,
         month_start=month_range[0],
@@ -100,34 +126,14 @@ if st.button("Run Query") and selected_stations and selected_gases and year_rang
         dow_start=day_range[0],
         dow_end=day_range[1]
     )
-    df = fetch_query(conn, data_query)
+    grouped_df = fetch_query(conn, data_query)
     if isinstance(selected_gases, str):
         selected_gases = [selected_gases]
 # Check if any of the selected columns have at least one non-null value
-    has_value = df[selected_gases].notna().any().any()
+    has_value = grouped_df is not None and not grouped_df.empty and grouped_df[selected_gases].notna().any().any()
 
     
-
-    if df is not None and  has_value:
-        pl_df = pl.DataFrame(df)
-        
-
-        # Aggregation
-        group_timeframe = {
-            "Year": pl.col("record_datetime").dt.year(),
-            "Month": pl.col("record_datetime").dt.month(),
-            "Day": pl.col("record_datetime").dt.weekday(),
-            "Hour": pl.col("record_datetime").dt.hour()
-        }
-
-        group_method = {
-            "Mean": pl.selectors.numeric().mean(),
-            "Median": pl.selectors.numeric().median()
-        }
-        grouped = pl_df.group_by(["Station", group_timeframe[timeframe]]).agg(group_method[agg_method])
-        grouped_df = grouped.to_pandas()
-        #st.dataframe(grouped_df)
-
+    if has_value:
         # Plotting
         st.success("Data Loaded Successfully")
         dynamic_groupby_bar_chart(grouped_df, selected_gases, timeframe)

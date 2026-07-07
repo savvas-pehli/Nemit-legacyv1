@@ -114,6 +114,20 @@ WHERE Station IN {stations}
   AND day_of_week BETWEEN {dow_start} AND {dow_end};
 """
 
+GET_AGGREGATTED_DATA = """
+        SELECT 
+            Station,
+            {timeframe} AS record_datetime,
+            {gas}
+        FROM main.clean 
+        WHERE Station IN {stations}
+          AND {year_condition}
+          AND Month BETWEEN {month_start} AND {month_end}
+          AND day_of_week BETWEEN {dow_start} AND {dow_end}
+        GROUP BY ALL
+        ORDER BY record_datetime ASC;
+    """
+
 CHECK_GAS_VALIDITY = """
 SELECT COUNT(*) AS count
 FROM clean
