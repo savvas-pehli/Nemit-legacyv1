@@ -144,9 +144,12 @@ SELECT year,Hour,municipality,"{air_pollutant}" FROM main.aggr_choro_per_hour_ye
 where region={region};
 """
 CHOROPLETH_YEARLY_QUERY = """
-SELECT year,municipality,'{air_pollutant}' FROM main.aggr_choro_per_year
+SELECT year,municipality,"{air_pollutant}" FROM main.aggr_choro_per_year
 where region={region};
 """
+
+GEOMETRIC_DATA_LOAD="""SELECT * from my_db.geometries.{table}_municipalities
+WHERE Municipality IN ({municipalities});"""
 
 #ECONOMIC ACTIVITY
 AIR_POL_QUERY = """SELECT column_name FROM information_schema.columns 

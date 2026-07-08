@@ -50,7 +50,7 @@ def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     fig.update_traces(marker_line_width=1, marker_line_color='black')
     fig.update_geos(fitbounds="locations", visible=False)
     fig.update_layout(height=600, width=1000)
-    st.plotly_chart(fig, theme='streamlit', use_container_width=True)
+    st.plotly_chart(fig, theme='streamlit', width='stretch')
 
 def dynamic_groupby_bar_chart(df, gases, timeframe):
     months = [
@@ -199,7 +199,7 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
         layout_args["title"] = ''
 
     fig.update_layout(**layout_args)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     
 def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
     fig = go.Figure()
@@ -295,4 +295,4 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
         layout_args["title"] = ''
 
     fig.update_layout(**layout_args)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')

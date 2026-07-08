@@ -8,31 +8,27 @@ if project_root not in sys.path:
 from utils.db_conn import get_db_connection, fetch_query, format_in_clause
 from utils.processing import has_stepsize_one
 from queries.sql_queries import (
-    GET_REGIONS_QUERY,
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,GET_ALL_STATIONS_QUERY,
-    GET_GAS_COLUMNS_QUERY,
     GET_AGGREGATTED_DATA,
-    #GET_AIR_POLLUTION_DATA
-    #CHECK_GAS_VALIDITY
 )
 from utils.plotting import dynamic_groupby_bar_chart
-import pandas as pd
+from utils.UI import get_cached_regions, get_cached_gases
 
 conn = get_db_connection()
 st.set_page_config(layout="wide", page_title="Pollution Data Dashboard")
 st.sidebar.title('Time and gas filters')
 
 # Region and Station Selection
-regions_df = pd.DataFrame(fetch_query(conn, GET_REGIONS_QUERY)['region'])
-if regions_df is not None and not regions_df.empty:
+regions=get_cached_regions(conn)
+if regions is not None and len(regions) > 0:
     # 3. Use the EXACT casing that exists in your database
-    # Check if your DB uses 'region' or 'Region'
-    regions = regions_df['region'].tolist() 
-    selected_regions = st.multiselect("Please select Region/s:", sorted(regions))
+    selected_regions = st.multiselect("Please select Region/s:", regions)
 else:
     st.error("⚠️ Connection lost or no regions found. Please refresh the page.")
     st.stop() # Halts the script safely instead of throwing a red error screen
+
+
     
 if selected_regions:
     region_clause = format_in_clause(selected_regions)
@@ -88,7 +84,7 @@ agg_method = st.sidebar.selectbox("Aggregation Method", ["Mean", "Median"])
 timeframe = st.sidebar.selectbox("Timeframe", ["Year", "Month", "Day", "Hour"])
 
 # Gas Pollutant Selection
-gas_columns = fetch_query(conn, GET_GAS_COLUMNS_QUERY)['column_name'].tolist()
+gas_columns = get_cached_gases(conn)
 selected_gases = st.sidebar.multiselect("Select Air Pollutants", gas_columns, max_selections=2)
 
 
@@ -135,6 +131,7 @@ if st.button("Run Query") and selected_stations and selected_gases and year_rang
     
     if has_value:
         # Plotting
+        st.write(grouped_df.head())
         st.success("Data Loaded Successfully")
         dynamic_groupby_bar_chart(grouped_df, selected_gases, timeframe)
     else:
