@@ -350,4 +350,4 @@ def localized_dual_axis_chart(df, y_metrics, timeframe):
 
     fig.update_layout(**layout_args)
     
-    st.plotly_chart(fig, width=' stretch')
+    st.plotly_chart(fig, width='stretch')
