@@ -13,10 +13,10 @@ from queries.sql_queries import (
 from utils.plotting import fuel_con_groupby_bar_chart
 
 
-conn = get_db_connection()
 st.set_page_config(
     layout="wide", page_title="Fuel Consumption Data Dashboard")
 st.sidebar.title('Time and gas filters')
+conn = get_db_connection()
 
 regions = fetch_query(conn, GET_FUEL_REGIONS_QUERY)['Region'].tolist()
 selected_regions = st.multiselect("Please select Region/s:", sorted(regions),max_selections=3)

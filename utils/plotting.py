@@ -296,3 +296,58 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
 
     fig.update_layout(**layout_args)
     st.plotly_chart(fig, width='stretch')
+    
+    
+def localized_dual_axis_chart(df, y_metrics, timeframe):
+    """
+    A pure, decoupled bar chart.
+    Accepts exactly 1 or 2 metrics and routes them to primary/secondary axes.
+    """
+    if df is None or df.empty:
+        st.warning("No data available to plot.")
+        return
+
+    fig = go.Figure()
+
+    # Dynamically assign traces to axes based on the number of metrics
+    for idx, metric in enumerate(y_metrics):
+        fig.add_trace(go.Bar(
+            x=df[timeframe],
+            y=df[metric],
+            name=metric,
+            yaxis="y" if idx == 0 else "y2",
+            offsetgroup=str(idx),
+            opacity=0.85
+        ))
+
+    layout_args = {
+        "barmode": "group",
+        "xaxis": {
+            "title": timeframe, 
+            "type": "category" # Forces discrete chronological ordering
+        },
+        "legend": {
+            "x": 1.05, 
+            "y": 1, 
+            "xanchor": "left", 
+            "yanchor": "top"
+        },
+        "margin": {"l": 60, "r": 60, "b": 60, "t": 60},
+        "title": f"Analytics for {', '.join(y_metrics)}"
+    }
+
+    # Primary Y-Axis Configuration
+    layout_args["yaxis"] = {"title": y_metrics[0]}
+
+    # Secondary Y-Axis Configuration (Only activates if a second metric is passed)
+    if len(y_metrics) > 1:
+        layout_args["yaxis2"] = {
+            "title": y_metrics[1],
+            "overlaying": "y",
+            "side": "right",
+            "showgrid": False
+        }
+
+    fig.update_layout(**layout_args)
+    
+    st.plotly_chart(fig, width=' stretch')

@@ -15,9 +15,9 @@ from queries.sql_queries import (
 from utils.plotting import dynamic_groupby_bar_chart
 from utils.UI import get_cached_regions, get_cached_gases
 
-conn = get_db_connection()
 st.set_page_config(layout="wide", page_title="Pollution Data Dashboard")
 st.sidebar.title('Time and gas filters')
+conn = get_db_connection()
 
 # Region and Station Selection
 regions=get_cached_regions(conn)

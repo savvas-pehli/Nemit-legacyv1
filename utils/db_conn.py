@@ -5,6 +5,7 @@ import streamlit as st
 import os 
 import duckdb
 import pandas as pd
+
 @st.cache_resource
 def get_db_connection():
     """Returns a cached SQL connection using credentials from Streamlit secrets."""

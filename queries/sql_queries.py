@@ -170,3 +170,43 @@ ECON_ACTIVITY_QUERY = """SELECT "year", "economic activity", "{air_pollutant}"
                          FROM gas_econ_activity 
                          WHERE "economic activity" IN {econ_act_query} 
                          AND "year" BETWEEN {start} AND {end}"""
+
+
+#=====LIMANI Queries=======
+PORT_AGGREGATION_QUERY = """
+            SELECT 
+                {timeframe},
+                {metric_aggs}
+            FROM 
+                thess_port_assesment.{target_table}
+            WHERE 
+                EXTRACT(YEAR FROM "Datetime") BETWEEN {year_range[0]} AND {year_range[1]}
+                AND EXTRACT(MONTH FROM "Datetime") BETWEEN {month_range[0]} AND {month_range[1]}
+                AND EXTRACT(ISODOW FROM "Datetime") BETWEEN {day_range[0]} AND {day_range[1]}
+            GROUP BY ALL
+            ORDER BY {timeframe_order} ASC;
+        """
+    
+PORT_COLUMNS_QUERY = """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'thess_port_assesment'
+          AND table_name = '{table_name}'
+          AND column_name NOT IN ('Datetime','Date')
+    """
+    
+PORT_TIME_COLUMN_QUERY = """
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'thess_port_assesment'
+          AND table_name = '{table_name}'
+          AND data_type IN ('DATE', 'TIMESTAMP', 'DATETIME')
+        LIMIT 1;
+    """
+    
+PORT_GET_TIME_BOUNDARIES_QUERY = """
+SELECT 
+    MIN("{time_col}") AS min_time,
+    MAX("{time_col}") AS max_time
+FROM thess_port_assesment.{table_name};
+"""
