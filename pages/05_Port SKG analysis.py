@@ -16,7 +16,7 @@ table_mapping = {
     "Atmospheric Gases": 'port_thessaloniki_gases',
     "Particles": 'port_thessaloniki_particles',
     "Acoustic/Sound Levels": 'port_thessaloniki_noise',
-    "Water Quality": 'port_thessaloniki_water_quality'
+    #"Water Quality": 'port_thessaloniki_water_quality'
 }
 
 
@@ -99,6 +99,7 @@ if st.button("Generate Analysis") and selected_metrics:
     )
     with st.spinner(f"Extracting {analysis_type} insights from warehouse..."):
         df = fetch_query(conn, data_query)
+        st.write(data_query)  # Debugging: Show the generated SQL query
     
     # ==============================================================================
     # 4. RENDERING
