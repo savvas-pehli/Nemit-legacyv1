@@ -52,9 +52,25 @@ else:
 available_metrics = get_port_table_columns(conn, table_name=target_table)
 selected_metrics = st.multiselect("Select Metrics to Analyze:", available_metrics, max_selections=2)
 
+
 # Time Filters
-month_range = st.sidebar.slider("Select Month Range:", min_value=1, max_value=12, value=(1, 12))
-day_range = st.sidebar.slider("Select Day of Week (1=Mon, 7=Sun):", min_value=1, max_value=7, value=(1, 7))
+months = list(range(1, 13))
+days_of_week = list(range(0, 7))
+months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+        ]
+        
+days =['Monday','Tuesday','Wednesday','Thursday','Firday','Saturday','Sunday']
+month_map = {month: int(index)+1  for index, month in enumerate(months)}
+days_map={day: index for index, day in enumerate(days)}
+
+
+month_range = st.sidebar.select_slider('Select Month Range',options=months,value=("January", "December"))
+month_range=[month_map[month] for month in month_range]
+
+day_range = st.sidebar.select_slider("Select Day of Week", options=days, value=('Monday', 'Sunday'))
+day_range=[days_map[day] for day in day_range]
 
 # 3. Dynamic UI: Only show the Hour slider if the data type supports it
 has_hours = time_col_name in ["Datetime", "timestamp"]

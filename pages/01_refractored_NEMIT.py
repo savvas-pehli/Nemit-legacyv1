@@ -99,7 +99,7 @@ if st.button("Run Query") and selected_stations and selected_gases and year_rang
     sql_timeframe = {
         "Year": "EXTRACT(YEAR FROM record_datetime)",
         "Month": "EXTRACT(MONTH FROM record_datetime)",
-        "Day": "EXTRACT(ISODOW FROM record_datetime)", # 1=Monday, 7=Sunday 
+        "Day": "EXTRACT(ISODOW FROM record_datetime)",
         "Hour": "EXTRACT(HOUR FROM record_datetime)"
     }
     
