@@ -99,7 +99,6 @@ if st.button("Generate Analysis") and selected_metrics:
     )
     with st.spinner(f"Extracting {analysis_type} insights from warehouse..."):
         df = fetch_query(conn, data_query)
-        st.write(data_query)  # Debugging: Show the generated SQL query
     
     # ==============================================================================
     # 4. RENDERING
@@ -107,8 +106,7 @@ if st.button("Generate Analysis") and selected_metrics:
     if df is not None and not df.empty:
         st.success("Data successfully processed by MotherDuck.")
         
-        # Pass the microscopic, pre-aggregated dataframe directly to your plotting utility
-        # Modify this line to point to your specific histogram function
+
         localized_dual_axis_chart(df, selected_metrics,timeframe) 
 
     else:
