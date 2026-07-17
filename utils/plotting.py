@@ -1,6 +1,8 @@
 import plotly.express as px
 import streamlit as st
 import plotly.graph_objects as go
+import pandas as pd
+
 
 def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     co_max = gdf[column].max()
@@ -297,7 +299,6 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
     fig.update_layout(**layout_args)
     st.plotly_chart(fig, width='stretch')
     
-    
 def localized_dual_axis_chart(df, y_metrics, timeframe):
     """
     A pure, decoupled bar chart.
@@ -351,3 +352,69 @@ def localized_dual_axis_chart(df, y_metrics, timeframe):
     fig.update_layout(**layout_args)
     
     st.plotly_chart(fig, width='stretch')
+    
+def plot_particle_distribution(df: pd.DataFrame, measurements: list, timeframe: str):
+    """
+    Transforms wide-format measurement data and renders a Faceted Line Chart.
+    Strictly avoids twin Y-axes by utilizing independent facet rows for vastly different scales.
+    """
+    if df.empty:
+        return None
+
+    # 1. The Transformation (Wide to Long)
+    # Plotly Express requires a 'melted' dataframe to map dimensions cleanly.
+    # We unpivot the measurement columns into two strictly typed columns: 'Particle_Size' and 'Value'
+    df_melted = df.melt(
+        id_vars=[timeframe, 'location', 'season'],
+        value_vars=measurements,
+        var_name='Particle_Size',
+        value_name='Concentration'
+    )
+
+    # 2. The Figure Architecture
+    # We use lines for time-series. 
+    # Columns = Locations, Rows = Particle Sizes, Color = Season.
+    fig = px.line(
+        df_melted,
+        x=timeframe,
+        y='Concentration',
+        color='season',
+        facet_col='location',      # Splits places side-by-side
+        facet_row='Particle_Size', # Splits measurements top-to-bottom
+        markers=True,
+        title=f"Particle Concentration Dynamics ({timeframe} Resolution)",
+        template="plotly_white",
+        hover_data={"location": True, "Particle_Size": True}
+    )
+
+    # 3. Scale Optimization
+    # If Ch1 has values of 50,000 and Ch2 has values of 0.5, locking the Y-axis 
+    # flattens the smaller metric into a straight line. We decouple the row axes.
+    fig.update_yaxes(matches=None, showticklabels=True)
+    
+    # Clean up the subplot titles (Removes the ugly "location=" text Plotly adds by default)
+    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+
+    # Enforce strict X-axis formatting based on the cyclical vs continuous timeframes
+    if timeframe == "Hour":
+        fig.update_xaxes(
+            title_text="Hour of Day",
+            tickmode='linear',
+            dtick=1, # Forces 24 distinct ticks as you requested
+            range=[0, 23]
+        )
+    elif timeframe == "Day":
+        # Let Plotly use the Categorical string names we set in Pandas
+        fig.update_xaxes(title_text="Day of the Week")
+    else:
+        fig.update_xaxes(title_text=timeframe)
+
+    fig.update_layout(
+        legend_title_text='Season',
+        hovermode="x unified", # Enterprise standard for time-series comparison
+        height=300 * len(measurements) # Dynamically scales height based on how many metrics are chosen
+    )
+    
+    fig.for_each_yaxis(lambda y: y.update(title_text='Avg Conc.'))
+    
+    return fig
