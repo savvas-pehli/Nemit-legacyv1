@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.db_conn_mysql import get_db_connection
+from utils.db_conn import get_db_connection
 from services.npets_service import get_npets_schema, fetch_aggregated_npets_data
 from utils.plotting import plot_particle_distribution
 import pandas as pd

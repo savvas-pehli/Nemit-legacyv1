@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy import text
 import streamlit as st
-
+from utils.db_conn import format_in_clause
 # ==============================================================================
 # CONFIGURATION & WHITELISTS (Decoupling logic from the UI)
 # ==============================================================================
@@ -12,9 +12,9 @@ VALID_TOOLS = {
 }
 
 # MySQL-compliant time extraction
-MYSQL_TIMEFRAME = {
-    "Day": "WEEKDAY(f.Datetime)",
-    "Hour": "HOUR(f.Datetime)"
+DUCKDB_TIMEFRAME = {
+    "Day": "(EXTRACT(ISODOW FROM f.Datetime) - 1)", # Maps 1-7 (Mon-Sun) down to 0-6 to match UI map
+    "Hour": "EXTRACT(HOUR FROM f.Datetime)"
 }
 
 def get_npets_schema(conn, tool_name: str) -> list:
@@ -28,16 +28,14 @@ def get_npets_schema(conn, tool_name: str) -> list:
     target_table = VALID_TOOLS[tool_name]
     
     # We query npets_tables and strictly exclude mechanical keys
-    query = text("""
-        SELECT COLUMN_NAME 
-        FROM INFORMATION_SCHEMA.COLUMNS 
-        WHERE TABLE_NAME = :table_name 
-          AND TABLE_SCHEMA = 'npets_tables' 
-          AND COLUMN_NAME NOT IN ('experiment_id', 'Datetime', 'Time', 'Date');
-    """)
-    
-    df = pd.read_sql(query, conn.engine, params={"table_name": target_table})
-    return df['COLUMN_NAME'].tolist()
+    query = f"""
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = '{target_table}' 
+          AND column_name NOT IN ('experiment_id', 'Datetime', 'Time', 'Date');
+    """
+    df = conn.execute(query).df()    
+    return df['column_name'].tolist()
 
 @st.cache_data(ttl=3600)
 def fetch_aggregated_npets_data(
@@ -54,25 +52,23 @@ def fetch_aggregated_npets_data(
     # 1. State Validation
     if tool_name not in VALID_TOOLS:
         raise ValueError("Security Alert: Invalid tool identifier")
-    if timeframe not in MYSQL_TIMEFRAME:
+    if timeframe not in DUCKDB_TIMEFRAME:
         raise ValueError("Security Alert: Invalid timeframe identifier")
         
     target_table = VALID_TOOLS[tool_name]
-    time_expr = MYSQL_TIMEFRAME[timeframe]
+    time_expr = DUCKDB_TIMEFRAME[timeframe]
     
     # 2. Dynamic Math Application (Hardcoded to Mean/AVG for now)
-    agg_columns = ", ".join([f"AVG(f.`{m}`) AS `{m}`" for m in measurements])
+    agg_columns = ", ".join([f'AVG(f."{m}") AS "{m}"' for m in measurements])
     
     # 3. Dynamic Parameter Binding Arrays
-    place_binds = [f":place_{i}" for i in range(len(places))]
-    season_binds = [f":season_{i}" for i in range(len(seasons))]
+    places_in = format_in_clause(places)
+    seasons_in = format_in_clause(seasons)
     
-    params = {}
-    for i, p in enumerate(places): params[f"place_{i}"] = p
-    for i, s in enumerate(seasons): params[f"season_{i}"] = s
+
     
     # 4. Construct and Execute the Star Schema Query
-    query = text(f"""
+    query = f"""
         SELECT 
              d.location,
              d.season,
@@ -80,12 +76,13 @@ def fetch_aggregated_npets_data(
             {agg_columns}
         FROM npets_tables.{target_table} f
         JOIN npets_tables.dim_experiment d ON f.experiment_id = d.experiment_id
-        WHERE d.location IN ({", ".join(place_binds)})
-          AND d.season IN ({", ".join(season_binds)})
-        GROUP BY d.location, d.season, time_bucket
+        WHERE d.location IN {places_in}
+          AND d.season IN {seasons_in.upper()}
+        GROUP BY ALL
         ORDER BY time_bucket ASC;
-    """)
-    return pd.read_sql(query, _conn.engine, params=params)
+    """    
+    df =_conn.execute(query).df()
+    return df
 
 
 @st.cache_data(ttl=3600)
@@ -104,31 +101,27 @@ def fetch_temporal_metadata(
         
     target_table = VALID_TOOLS[tool_name]
     
-    place_binds = [f":place_{i}" for i in range(len(places))]
-    season_binds = [f":season_{i}" for i in range(len(seasons))]
+    places_in = format_in_clause(places)
+    seasons_in = format_in_clause(seasons)
     
-    params = {}
-    for i, p in enumerate(places): params[f"place_{i}"] = p
-    for i, s in enumerate(seasons): params[f"season_{i}"] = s
     
     # We query only for the distinct chronological components
-    query = text(f"""
+    query = f"""
         SELECT DISTINCT 
             EXTRACT(YEAR FROM f.Datetime) AS data_year,
             EXTRACT(MONTH FROM f.Datetime) AS data_month
         FROM npets_tables.{target_table} f
         JOIN npets_tables.dim_experiment d ON f.experiment_id = d.experiment_id
-        WHERE d.location IN ({", ".join(place_binds)})
-          AND d.season IN ({", ".join(season_binds)})
+        WHERE d.location IN {places_in}
+          AND d.season IN {seasons_in.upper()}
         ORDER BY data_year ASC, data_month ASC;
-    """)
-    
-    df = pd.read_sql(query, _conn.engine, params=params)
+    """
+    df = _conn.execute(query).df()
     df.dropna(subset=['data_year', 'data_month'], how='all', inplace=True)
+    
     if df.empty:
         return {"years": [], "months": []}
-        
-    # Extract unique components and cast to pure Python integers
+    
     return {
         "years": df['data_year'].astype(int).unique().tolist(),
         "months": df['data_month'].astype(int).unique().tolist()

@@ -32,23 +32,11 @@ def get_db_connection():
     except Exception as e:
         st.error(f"Cloud Connection Failed: {e}")
         st.stop()
-        
-    #creds = st.secrets["motherduck"]
-    #token=creds["token"]
-    #db_url = f"mysql://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['database']}"
-    #db_url = f"mysql://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['database']}"
-    #return st.connection("mysql", type="sql", url=db_url)
 
 def quote(value: str) -> str:
     """Wraps a string safely for SQL usage."""
     return f"'{value}'"
 
-#def format_in_clause(values: list[str]) -> str:
-#    """Formats a list of values into a SQL-safe IN clause."""
-#    if not values:
-#        return "()"
-#    return f"({', '.join(quote(v) for v in values)})" if values else "()"
-#
 def format_in_clause(values: list[str]) -> str:
     """Formats a list of values into a SQL-safe IN clause."""
     if not values:
@@ -73,10 +61,4 @@ def fetch_query(conn, query: str) -> pd.DataFrame | None:
     except Exception as e:
         st.error(f"Query Execution Error: {e}")
         return None
-#def fetch_query(conn, query: str) -> Any:
-#    """Executes an SQL query safely with basic error handling."""
-#    try:
-#        return conn.query(query)
-#    except Exception as e:
-#        st.error(f"Query execution Error: {e}")
-#        return None
+
