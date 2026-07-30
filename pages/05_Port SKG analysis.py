@@ -1,97 +1,108 @@
 import streamlit as st
-from utils.db_conn import get_db_connection, fetch_cached_query
-from utils.plotting import localized_dual_axis_chart 
-from queries.sql_queries import PORT_AGGREGATION_QUERY
-from utils.constants import PORT_TABLE_MAPPING, MONTHS_LIST, DAYS_LIST, MONTH_MAP, DAYS_MAP
-from services.port_services import (
-    get_cached_port_metadata, 
-    get_cached_year_bounds, 
-    get_cached_port_columns
-)
-
+import pandas as pd
+from utils.db_conn import get_db_connection
+from services.port_services import get_port_metadata, fetch_aggregated_port_data
+from utils.plotting import localized_dual_axis_chart
+from utils.constants import MONTHS_LIST,MONTH_MAP,DAYS_LIST,DAYS_MAP, VALID_TABLES
 st.set_page_config(page_title="Site Analytics", layout="wide")
 st.title("Localized Environmental Analytics")
+st.markdown("---")
 
-# 1. Connection Setup
+
 conn = get_db_connection()
-
-# --- CACHE CONTROL (The Manual Flush) ---
-st.sidebar.markdown("### System Controls")
-if st.sidebar.button("🔄 Force Refresh Data"):
-    st.cache_data.clear()
-    st.sidebar.success("Cache wiped. The next query will hit the database.")
-st.sidebar.markdown("---")
-
+# ==============================================================================
+# PRIMARY FILTERS (Triggers Schema Update)
+# ==============================================================================
 st.sidebar.markdown("### Analysis Parameters")
 
-analysis_type = st.selectbox("Select Analysis Type:", list(PORT_TABLE_MAPPING.keys()))
-target_table = PORT_TABLE_MAPPING[analysis_type]
+analysis_type = st.selectbox("Select Analysis Type:", options=list(VALID_TABLES.keys()))
 
-# 2. Cached Metadata Retrieval (Instantaneous)
-time_col_name, time_col_type = get_cached_port_metadata(conn, target_table)
-
-if not time_col_name:
-    st.error(f"Fatal Schema Error: No DATE or TIMESTAMP column found in {target_table}.")
+try:
+    meta = get_port_metadata(conn, analysis_type)
+except Exception as e:
+    st.error(f"Failed to retrieve schema: {e}")
     st.stop()
 
-year_bounds = get_cached_year_bounds(conn, target_table, time_col_name)
-min_y, max_y = year_bounds["min_year"], year_bounds["max_year"]
+if not meta["time_col"]:
+    st.error(f"Fatal Schema Error: No temporal column found for {analysis_type}.")
+    st.stop()
+
+# ==============================================================================
+# DYNAMIC MEASUREMENT RETRIEVAL
+# ==============================================================================
+selected_metrics = st.multiselect(
+    "Select Metrics to Analyze:", 
+    options=meta["metrics"], 
+    max_selections=2
+)
+
+# ==============================================================================
+# TEMPORAL FILTERS
+# ==============================================================================
+min_y, max_y = meta["min_year"], meta["max_year"]
 
 if min_y == max_y:
-    st.info(f"Data is locked to a single year: **{min_y}**")
+    st.sidebar.info(f"Data is locked to a single year: **{min_y}**")
     year_range = (min_y, min_y)
 else:
     year_range = st.sidebar.slider("Select Year Range:", min_value=min_y, max_value=max_y, value=(min_y, max_y))
 
-available_metrics = get_cached_port_columns(conn, target_table)
-selected_metrics = st.multiselect("Select Metrics to Analyze:", available_metrics, max_selections=2)
+ui_month_range = st.sidebar.select_slider('Select Month Range', options=MONTHS_LIST, value=("January", "December"))
+db_month_range = (MONTH_MAP[ui_month_range[0]], MONTH_MAP[ui_month_range[1]])
 
-# 3. Static Filters using Constants
-month_range = st.sidebar.select_slider('Select Month Range', options=MONTHS_LIST, value=("January", "December"))
-month_range_mapped = [MONTH_MAP[m] for m in month_range]
+ui_day_range = st.sidebar.select_slider("Select Day of Week", options=DAYS_LIST, value=('Monday', 'Sunday'))
+db_day_range = (DAYS_MAP[ui_day_range[0]], DAYS_MAP[ui_day_range[1]])
 
-day_range = st.sidebar.select_slider("Select Day of Week", options=DAYS_LIST, value=('Monday', 'Sunday'))
-day_range_mapped = [DAYS_MAP[d] for d in day_range]
-
-has_hours = time_col_name.lower() in ["datetime", "timestamp"]
-timeframe_options = ["Year", "Month", "Day", "Hour"] if has_hours else ["Year", "Month", "Day"]
-timeframe = st.sidebar.selectbox("Timeframe", timeframe_options)
+timeframe_options = ["Year", "Month", "Day", "Hour"]
+timeframe = st.sidebar.selectbox("Timeframe Resolution:", timeframe_options)
 
 agg_method = st.sidebar.selectbox("Aggregation Method:", ["Mean", "Median"])
 
-# 4. Query Execution
-if st.button("Generate Analysis") and selected_metrics:
-    sql_agg = "AVG" if agg_method == "Mean" else "MEDIAN"
-    metric_aggs = ', '.join([f'{sql_agg}("{m}") AS "{m}"' for m in selected_metrics])
-    
-    sql_timeframe = {
-        "Year": f"EXTRACT(YEAR FROM {time_col_name}) as Year",
-        "Month": f"EXTRACT(MONTH FROM {time_col_name}) as Month",
-        "Day": f"EXTRACT(ISODOW FROM {time_col_name}) as Day",
-        "Hour": f"EXTRACT(HOUR FROM {time_col_name}) as Hour"
-    }
-    
-    timeframe_expr = sql_timeframe[timeframe]
-    
-    data_query = PORT_AGGREGATION_QUERY.format(
-        timeframe=timeframe_expr,
-        timeframe_order=timeframe,
-        metric_aggs=metric_aggs, 
-        target_table=target_table,
-        year_range=year_range,
-        month_range=month_range_mapped,
-        day_range=day_range_mapped
-    )
-    
-    with st.spinner(f"Extracting {analysis_type} insights from warehouse..."):
-        # HIT THE MEMORY-SAFE CACHE INSTEAD OF THE DB
-        df = fetch_cached_query(conn, data_query)
-    
-    if df is not None and not df.empty:
-        st.success("Data successfully retrieved.")
-        localized_dual_axis_chart(df, selected_metrics, timeframe) 
-    else:
-        st.warning("No data found for the selected parameters.")
+# ==============================================================================
+# CACHE CONTROL
+# ==============================================================================
+st.sidebar.markdown("### System Controls")
+if st.sidebar.button("🔄 Force Refresh Data", type="primary"):
+    st.cache_data.clear()
+    st.sidebar.success("Cache wiped.")
+st.sidebar.markdown("---")
+
+# ==============================================================================
+# AGGREGATION & EXECUTION
+# ==============================================================================
+if st.button("Generate Analysis", type="primary"):
+    if not selected_metrics:
+        st.warning("⚠️ You must select at least one metric.")
+        st.stop()
         
-elif not selected_metrics:
-    st.info("Please select at least one metric to begin.")
+    with st.spinner("Extracting insights from warehouse..."):
+        try:
+            df_result = fetch_aggregated_port_data(
+                _conn=conn,
+                agg_type=agg_method,
+                table_alias=analysis_type,
+                measurements=selected_metrics,
+                timeframe=timeframe,
+                year_range=year_range,
+                month_range=db_month_range,
+                day_range=db_day_range
+            )
+            
+            if df_result.empty:
+                st.warning("No data found for the selected parameters.")
+                st.stop()
+            
+            # Map UI strings for display
+            df_result.rename(columns={'time_bucket': timeframe}, inplace=True)
+            
+            if timeframe == "Day":
+                # Isodow returns 1-7. Map it to text for visualization.
+                isodow_map = {1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday'}
+                df_result[timeframe] = df_result[timeframe].map(isodow_map)
+                df_result[timeframe] = pd.Categorical(df_result[timeframe], categories=DAYS_LIST, ordered=True)
+
+            st.success("Data successfully processed.")
+            localized_dual_axis_chart(df_result, selected_metrics, timeframe)
+            
+        except Exception as e:
+            st.error(f"Execution Error: {e}")
