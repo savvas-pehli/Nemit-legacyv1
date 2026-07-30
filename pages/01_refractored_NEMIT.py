@@ -131,7 +131,6 @@ if st.button("Run Query") and selected_stations and selected_gases and year_rang
     
     if has_value:
         # Plotting
-        st.write(grouped_df.head())
         st.success("Data Loaded Successfully")
         dynamic_groupby_bar_chart(grouped_df, selected_gases, timeframe)
     else:
