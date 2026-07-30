@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import plotly.express as px
-from utils.db_conn import get_db_connection, fetch_query,format_in_clause
+from utils.db_conn import get_db_connection, fetch_cached_query,format_in_clause
 from queries.sql_queries import (AIR_POL_QUERY,
                               MAIN_ECON_ACTIVITY,
                               SUB_ECON_QUERY,
@@ -19,7 +19,7 @@ st.sidebar.title('Time and gas filters')
 
 # Always show year slider
 year_query = """SELECT DISTINCT(Year) as Year FROM gas_econ_activity;"""
-year_df = fetch_query(conn, year_query)
+year_df = fetch_cached_query(conn, year_query)
 if year_df is not None and not year_df.empty:
     year_list = list(year_df["Year"])
     years_selected = st.sidebar.select_slider(
@@ -33,11 +33,11 @@ else:
     
 
 # Always show air pollutant selector
-air_pol_list=fetch_query(conn, AIR_POL_QUERY)
+air_pol_list=fetch_cached_query(conn, AIR_POL_QUERY)
 air_pollutant = st.sidebar.selectbox('Please select one air pollutant', options=list(air_pol_list['column_name']))
 
 # Main economic activity selection
-econ_activity_list=fetch_query(conn,MAIN_ECON_ACTIVITY)
+econ_activity_list=fetch_cached_query(conn,MAIN_ECON_ACTIVITY)
 econ_act = st.multiselect('Please select economic activity', options=np.sort(list(econ_activity_list['economic activity'])), max_selections=5)
 
 # Info and checkbox logic
@@ -53,7 +53,7 @@ if len(econ_act) == 1:
         code_name = list(econ_activity_list[econ_activity_list['economic activity'].isin(econ_act)]['code name'])
         code_name_regex = f"{'|'.join(code_name)}"
         sub_econ_query=SUB_ECON_QUERY.format(code_name_regex=code_name_regex)
-        sub_list = fetch_query(conn,sub_econ_query)
+        sub_list = fetch_cached_query(conn,sub_econ_query)
         sub_econ_act = st.multiselect(
             'Please select sub-economic activities',
             options=np.sort(list(sub_list['economic activity'])),
@@ -76,7 +76,7 @@ if run_query:
         st.warning("Please select an air pollutant.")
     else:
         data_query=ECON_ACTIVITY_QUERY.format(air_pollutant=air_pollutant,econ_act_query=econ_act_query,start=min(years_selected),end=max(years_selected))
-        filtered_df = fetch_query(conn,data_query)
+        filtered_df = fetch_cached_query(conn,data_query)
 
         if filtered_df.empty or filtered_df is None:
             st.warning("No data available for the selected options.")

@@ -20,3 +20,8 @@ VALID_TABLES = {
     "Particles": "port_thessaloniki_particles",
     "Acoustic/Sound Levels": "port_thessaloniki_noise"
 }
+
+VALID_FUEL_TABLES = {
+    "regional_fuel_con": "Region",
+    "prefecture_fuel_con": "Prefecture"
+}
