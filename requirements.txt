@@ -3,5 +3,5 @@ pandas
 plotly
 polars
 Shapely
-duckdb==1.5.4
+duckdb
 python-dotenv
