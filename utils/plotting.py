@@ -263,7 +263,7 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
             y=1.20,  # Slightly above the plot
             xref="paper",
             yref="paper",
-            text=f"Pollution Levels of {places_num[number_of_locations]} {','.join(locations)} <br>for {fuels[0].split(' ')[0]} fuel",
+            text=f"Fuel consumption for {places_num[number_of_locations]} {','.join(locations)} <br> of  {fuels[0].split(' ')[0]} fuel",
             showarrow=False,
             font=dict(size=25),
             align="center"
@@ -274,7 +274,7 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
     elif len(fuels) > 1:
         locations=' , '.join([name.replace("_"," ")for name in locations])
         layout_args["yaxis"] = {"title": fuels[0]}
-        layout_args["title"]=f"Pollution Levels of {places_num[number_of_locations]} {locations} for {fuels[0]}"
+        layout_args["title"]=f"fuel consumption for {places_num[number_of_locations]} {locations} of {fuels[0]}"
         layout_args["yaxis2"] = {
                      "title": fuels[1],
                      "overlaying": "y",  # Overlay on primary y-axis
@@ -287,7 +287,7 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
             y=1.20,  # Slightly above the plot
             xref="paper",
             yref="paper",
-            text=f"Pollution Levels of {places_num[number_of_locations]} {locations} <br>for {', '.join(fuels)}",
+            text=f"Fuel consumption for  {places_num[number_of_locations]} {locations} <br> of {', '.join(fuels)}",
             showarrow=False,
             font=dict(size=25),
             align="center"

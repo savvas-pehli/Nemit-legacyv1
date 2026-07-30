@@ -1,41 +1,39 @@
 # services/fuel_service.py
 import streamlit as st
-from utils.db_conn import fetch_cached_query
+from utils.db_conn import fetch_query
 from utils.constants import VALID_FUEL_TABLES
 from queries.sql_queries import (
     GET_FUEL_REGIONS_QUERY,
     GET_ALL_FUEL_PREFECTURES_QUERY,
     GET_FUEL_COLUMNS_QUERY,
-    GET_YEAR_RANGE_FUEL_QUERY
-)
+    GET_YEAR_RANGE_FUEL_QUERY)
 import pandas as pd
 
-
-@st.cache_data(ttl=86400) # Cache expires after 24 hours
+@st.cache_data(ttl=3600, max_entries=100, show_spinner=False)
 def get_cached_regions(_conn):
     """Fetches regions once and stores in RAM."""
-    df = fetch_cached_query(_conn, GET_FUEL_REGIONS_QUERY)
+    df = fetch_query(_conn, GET_FUEL_REGIONS_QUERY)
     return df['Region'].tolist()
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=3600, max_entries=100, show_spinner=False)
 def get_cached_all_prefectures(_conn):
     """Fetches prefectures once and stores in RAM."""
-    df = fetch_cached_query(_conn, GET_ALL_FUEL_PREFECTURES_QUERY)
+    df = fetch_query(_conn, GET_ALL_FUEL_PREFECTURES_QUERY)
     return [pref.capitalize() for pref in df['Prefecture'].tolist()]
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=3600, max_entries=100, show_spinner=False)
 def get_cached_fuel_columns(_conn):
     """Fetches fuel column schema once."""
-    df = fetch_cached_query(_conn, GET_FUEL_COLUMNS_QUERY)
+    df = fetch_query(_conn, GET_FUEL_COLUMNS_QUERY)
     return df['column_name'].tolist()
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=3600, max_entries=100, show_spinner=False)
 def get_cached_year_range(_conn):
     """Fetches historical boundaries once."""
-    df = fetch_cached_query(_conn, GET_YEAR_RANGE_FUEL_QUERY)
+    df = fetch_query(_conn, GET_YEAR_RANGE_FUEL_QUERY)
     return df.iloc[0, :].tolist()
 
-@st.cache_data(ttl=86400, max_entries=50)
+@st.cache_data(ttl=3600, max_entries=10, show_spinner=False)
 def get_cached_prefectures_by_region(_conn, selected_regions: list):
     """
     Safely retrieves prefectures based on regions using parameterized binding.
@@ -48,15 +46,15 @@ def get_cached_prefectures_by_region(_conn, selected_regions: list):
     
     query = f"""
         SELECT DISTINCT Prefecture 
-        FROM geographic_data 
+        FROM main.prefecture_fuel_con
         WHERE Region IN ({placeholders})
     """
     # Pass the list of regions as the parameter tuple
+    
     df = _conn.execute(query, tuple(selected_regions)).df()
     return [pref.capitalize() for pref in df['Prefecture'].tolist()]
 
-
-@st.cache_data(ttl=3600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10, show_spinner=False)
 def fetch_aggregated_fuel_data(
     _conn, 
     table_alias: str, 

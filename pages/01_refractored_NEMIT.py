@@ -5,7 +5,7 @@ import numpy as np
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-from utils.db_conn import get_db_connection, fetch_cached_query, format_in_clause
+from utils.db_conn import get_db_connection, fetch_query, format_in_clause
 from utils.processing import has_stepsize_one
 from queries.sql_queries import (
     GET_STATIONS_BY_REGIONS_QUERY,
@@ -33,9 +33,9 @@ else:
 if selected_regions:
     region_clause = format_in_clause(selected_regions)
     station_query = GET_STATIONS_BY_REGIONS_QUERY.format(regions=region_clause)
-    stations = fetch_cached_query(conn, station_query)['station'].tolist()
+    stations = fetch_query(conn, station_query)['station'].tolist()
 else:
-    stations = fetch_cached_query(conn, GET_ALL_STATIONS_QUERY)['station'].tolist()
+    stations = fetch_query(conn, GET_ALL_STATIONS_QUERY)['station'].tolist()
 stations=[station.capitalize() for station in stations]
 selected_stations = st.multiselect("Please select Station/s:", sorted(stations), max_selections=3)
 
@@ -48,7 +48,7 @@ if selected_stations:
         stations=station_clause,
         station_count=len(selected_stations)
     )
-    years_df = fetch_cached_query(conn, year_query)
+    years_df = fetch_query(conn, year_query)
     common_years = years_df['Year'].tolist() if years_df is not None else []
 else:
     common_years = []
@@ -122,7 +122,7 @@ if st.button("Run Query") and selected_stations and selected_gases and year_rang
         dow_start=day_range[0],
         dow_end=day_range[1]
     )
-    grouped_df = fetch_cached_query(conn, data_query)
+    grouped_df = fetch_query(conn, data_query)
     if isinstance(selected_gases, str):
         selected_gases = [selected_gases]
 # Check if any of the selected columns have at least one non-null value

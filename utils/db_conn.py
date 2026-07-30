@@ -49,8 +49,7 @@ def column_name_transform(values:list[str])-> list:
     return f"({', '.join(quote(v) for v in values)})"
 
 
-@st.cache_data(ttl=3600, max_entries=20, show_spinner=False)
-def fetch_cached_query(conn, query: str) -> pd.DataFrame | None:
+def fetch_query(conn, query: str) -> pd.DataFrame | None:
     """
     Executes a SQL query against MotherDuck and returns a Pandas DataFrame.
     DuckDB handles this conversion natively and highly efficiently.
