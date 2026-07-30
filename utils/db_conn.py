@@ -14,10 +14,8 @@ def get_db_connection():
     if "token" in st.secrets['motherduck']:
         creds= st.secrets["motherduck"]
         token=creds['token']
-        print(token)
     else:
         token = os.getenv("MOTHERDUCK_TOKEN")
-        print(token)
 
     if not token:
         st.error("CRITICAL: MotherDuck token is missing. Pipeline halted.")
