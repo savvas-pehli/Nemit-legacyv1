@@ -39,7 +39,8 @@ def get_npets_schema(conn, tool_name: str) -> list:
 
 @st.cache_data(ttl=3600)
 def fetch_aggregated_npets_data(
-    _conn, 
+    _conn,
+    agg_type,
     tool_name: str, 
     places: list, 
     seasons: list, 
@@ -57,9 +58,10 @@ def fetch_aggregated_npets_data(
         
     target_table = VALID_TOOLS[tool_name]
     time_expr = DUCKDB_TIMEFRAME[timeframe]
-    
+    aggregations={"Mean":'AVG','Median':'Median'}
+    method=aggregations[agg_type]
     # 2. Dynamic Math Application (Hardcoded to Mean/AVG for now)
-    agg_columns = ", ".join([f'AVG(f."{m}") AS "{m}"' for m in measurements])
+    agg_columns = ", ".join([f'{method}(f."{m}") AS "{m}"' for m in measurements])
     
     # 3. Dynamic Parameter Binding Arrays
     places_in = format_in_clause(places)

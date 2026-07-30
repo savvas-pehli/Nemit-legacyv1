@@ -64,6 +64,7 @@ if not selected_measurements:
 # ==============================================================================
 st.markdown("### Time Aggregation")
 selected_timeframe = st.radio("Select Time Resolution:", options=TIMEFRAMES, horizontal=True)
+selected_agg_type = st.radio("Select Time Resolution:", options=['Mean','Median'], horizontal=True)
 
 # Map UI strings to database strings
 db_places = [PLACE_MAPPING[p] for p in selected_places]
@@ -74,6 +75,7 @@ if st.button("Execute Analysis", type="primary"):
         try:
             df_result = fetch_aggregated_npets_data(
                 _conn=conn,
+                agg_type=selected_agg_type,
                 tool_name=selected_tool,
                 places=db_places,
                 seasons=selected_seasons,
