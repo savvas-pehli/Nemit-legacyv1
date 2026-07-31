@@ -49,14 +49,20 @@ def column_name_transform(values:list[str])-> list:
     return f"({', '.join(quote(v) for v in values)})"
 
 
-def fetch_query(conn, query: str) -> pd.DataFrame | None:
+def fetch_query(conn, query: str, params: tuple | list | None = None) -> pd.DataFrame | None:
     """
     Executes a SQL query against MotherDuck and returns a Pandas DataFrame.
+    Supports secure parameter binding for dynamic WHERE clauses.
     DuckDB handles this conversion natively and highly efficiently.
     """
     try:
-        # DuckDB's .df() method natively outputs to Pandas
+        # If parameters are provided, pass them to the execution engine
+        if params:
+            return conn.execute(query, params).df()
+        
+        # Fallback for static queries without parameters
         return conn.execute(query).df()
+        
     except Exception as e:
         st.error(f"Query Execution Error: {e}")
         return None

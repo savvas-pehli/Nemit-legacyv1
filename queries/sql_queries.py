@@ -40,7 +40,7 @@ SELECT DISTINCT region FROM new_stations_regions;
 """
 
 GET_STATIONS_BY_REGIONS_QUERY = """
-SELECT station FROM new_stations_regions WHERE region IN {regions};
+SELECT station FROM new_stations_regions WHERE region IN ({placeholders});
 """
 
 GET_ALL_STATIONS_QUERY = """
@@ -91,15 +91,15 @@ WHERE "code name" REGEXP '^[{code_names}]' AND CHAR_LENGTH("code name") > 1;
 
 # == Years ==
 GET_DISTINCT_YEARS_QUERY = """
-SELECT DISTINCT "Year" FROM gas_econ_activity;
+SELECT DISTINCT "Year" as Year FROM gas_econ_activity;
 """
 
 GET_COMMON_YEARS_FOR_STATIONS = """
 SELECT Year
 FROM newyearstations
-WHERE station IN {stations}
+WHERE station IN ({placeholders})
 GROUP BY Year
-HAVING COUNT(DISTINCT station) = {station_count};
+HAVING COUNT(DISTINCT station) = ?;
 """
 
 # == Data Extraction ==
@@ -115,18 +115,18 @@ WHERE Station IN {stations}
 """
 
 GET_AGGREGATTED_DATA = """
-        SELECT 
-            Station,
-            {timeframe} AS record_datetime,
-            {gas}
-        FROM main.clean 
-        WHERE Station IN {stations}
-          AND {year_condition}
-          AND Month BETWEEN {month_start} AND {month_end}
-          AND day_of_week BETWEEN {dow_start} AND {dow_end}
-        GROUP BY ALL
-        ORDER BY record_datetime ASC;
-    """
+SELECT 
+    Station,
+    {timeframe_expr} AS record_datetime,
+    {gas_aggs}
+FROM main.clean 
+WHERE Station IN ({station_placeholders})
+  AND {year_condition_expr}
+  AND Month BETWEEN ? AND ?
+  AND day_of_week BETWEEN ? AND ?
+GROUP BY ALL
+ORDER BY record_datetime ASC;
+"""
 
 CHECK_GAS_VALIDITY = """
 SELECT COUNT(*) AS count
@@ -141,15 +141,15 @@ WHERE Station IN {stations}
 # == Choropleth ==
 CHOROPLETH_HOURLY_YEARLY_QUERY = """
 SELECT year,Hour,municipality,"{air_pollutant}" FROM main.aggr_choro_per_hour_year
-where region={region};
+where region=?;
 """
 CHOROPLETH_YEARLY_QUERY = """
 SELECT year,municipality,"{air_pollutant}" FROM main.aggr_choro_per_year
-where region={region};
+where region=?;
 """
 
 GEOMETRIC_DATA_LOAD="""SELECT * from my_db.geometries.{table}_municipalities
-WHERE Municipality IN ({municipalities});"""
+WHERE Municipality IN ({placeholders});"""
 
 #ECONOMIC ACTIVITY
 AIR_POL_QUERY = """SELECT column_name FROM information_schema.columns 
@@ -163,13 +163,14 @@ MAIN_ECON_ACTIVITY = """SELECT DISTINCT("economic activity"), "code name"
 
 SUB_ECON_QUERY = """SELECT DISTINCT "economic activity" 
 FROM gas_econ_activity
-WHERE starts_with(trim("code name"), '{code_name_regex}') 
+WHERE starts_with(trim("code name"), ?) 
   AND length(trim("code name")) > 1;"""
 
 ECON_ACTIVITY_QUERY = """SELECT "year", "economic activity", "{air_pollutant}" 
                          FROM gas_econ_activity 
-                         WHERE "economic activity" IN {econ_act_query} 
-                         AND "year" BETWEEN {start} AND {end}"""
+                         WHERE "economic activity" IN ({placeholders}) 
+                         AND "year" BETWEEN ? AND ?
+                         ORDER BY "year" ASC;"""
 
 
 #=====LIMANI Queries=======
