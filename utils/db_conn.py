@@ -10,7 +10,6 @@ import pandas as pd
 def get_db_connection():
     """Returns a cached SQL connection using credentials from Streamlit secrets."""
     token = None
-    print(st.secrets)
     if "token" in st.secrets['motherduck']:
         creds= st.secrets["motherduck"]
         token=creds['token']

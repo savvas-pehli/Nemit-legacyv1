@@ -7,7 +7,7 @@ from queries.sql_queries import (
     SUB_ECON_QUERY,
     ECON_ACTIVITY_QUERY
 )
-import streamlit as st
+
 def get_cached_years(_conn) -> list:
     """Fetches the distinct chronological boundaries."""
     df = fetch_query(_conn, GET_DISTINCT_YEARS_QUERY)
