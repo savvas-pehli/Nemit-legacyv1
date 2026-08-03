@@ -41,7 +41,6 @@ prefecture_check = st.checkbox("Enable Prefecture Grouping", value=False, key="p
 # ==============================================================================
 # FUEL & TIME FILTERS
 # ==============================================================================
-# BUG FIX: Removed the redundant fetch_query calls that were crashing the script.
 selected_fuels = st.sidebar.multiselect("Select Fuel Types", fuel_columns, max_selections=2)
 
 year_range = st.sidebar.slider(
