@@ -1,7 +1,7 @@
-geopandas
-pandas
-plotly
-polars
-Shapely
+geopandas==1.1.4
+pandas==3.0.3
+plotly==6.8.0
+polars==1.41.1
+Shapely==2.0.2
 duckdb==1.5.4
-python-dotenv
+python-dotenv==1.2.2
