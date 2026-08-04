@@ -1,5 +1,4 @@
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
 from utils.db_conn import format_in_clause
 # ==============================================================================
