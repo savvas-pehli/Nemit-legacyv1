@@ -5,6 +5,9 @@ import streamlit as st
 import os 
 import duckdb
 import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
 
 @st.cache_resource
 def get_db_connection():
@@ -17,16 +20,21 @@ def get_db_connection():
         token = os.getenv("MOTHERDUCK_TOKEN")
 
     if not token:
-        st.error("CRITICAL: MotherDuck token is missing. Pipeline halted.")
+        msg = "CRITICAL: MotherDuck token is missing. Pipeline halted."
+        st.error(msg)
+        logger.error(msg)
         st.stop()
+        
         
     target_database='my_db'
     
     try:
         # Connecting directly to the cloud database using the resolved token
+        logger.info(f"Establishing cloud connection to MotherDuck database: {target_database}")
         conn = duckdb.connect(f'md:{target_database}?motherduck_token={token}')
         return conn
     except Exception as e:
+        logger.critical(f"Cloud Connection Failed on DB {target_database}: {str(e)}", exc_info=True)
         st.error(f"Cloud Connection Failed: {e}")
         st.stop()
 

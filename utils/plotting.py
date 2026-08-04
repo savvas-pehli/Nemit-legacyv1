@@ -3,7 +3,6 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 
-
 def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     co_max = gdf[column].max()
     pollutant_name, measurement_unit = column.split(" ", 1)
@@ -96,20 +95,26 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
     if not fig.data:
             st.warning("No data traces were added to the plot. Check selected gases, stations, and aggregated data.")
             return
+    global_dates = df['record_datetime'].sort_values().unique()
+    
+    # 2. FIX: Map the global dates to your ticktext formats safely.
     group_timeframe = {
-            "Year": station_data['record_datetime'].sort_values(),
-            "Month":station_data['record_datetime'].sort_values().map({v: k for k, v in month_map.items()}).unique(),
-            "Day": station_data['record_datetime'].sort_values().map({v: k for k, v in days_map.items()}).unique(),
-            "Hour": [f"{int(x):02}:00:00"for x in range(0,24)]
-        }
+        "Year": global_dates,
+        "Month": pd.Series(global_dates).map({v: k for k, v in month_map.items()}).values,
+        "Day": pd.Series(global_dates).map({v: k for k, v in days_map.items()}).values,
+        "Hour": [f"{int(x):02}:00:00" for x in range(0, 24)]
+    }
 
     fig.update_layout(
-    xaxis=dict(
-    tickmode='array',
-    tickvals=station_data['record_datetime'].sort_values(),
-    ticktext=tuple(group_timeframe[timeframe])
-    )    
+        xaxis=dict(
+            type='category', 
+            categoryorder='array',           
+            categoryarray=global_dates,     
+            tickmode='array',
+            tickvals=global_dates,
+            ticktext=tuple(group_timeframe[timeframe]) if timeframe != "Hour" else None
         )
+    )
     layout_args = {
         "barmode": "group",
         "xaxis": {"title": timeframe},

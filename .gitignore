@@ -5,7 +5,7 @@
 venv/
 .venv/
 env/
-
+migration_data_files/
 # 2. Python Compiled Files & Cache
 # Byte-compiled files:
 __pycache__/
