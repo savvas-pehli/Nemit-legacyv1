@@ -4,7 +4,7 @@ import streamlit as st
 #from typing import Any
 import pandas as pd
 import logging
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 logger = logging.getLogger(__name__)
 
 @st.cache_resource
@@ -48,12 +48,15 @@ def column_name_transform(values:list[str])-> list:
     return f"({', '.join(quote(v) for v in values)})"
 
 
-def fetch_query(conn, query: str, params: tuple | list | dict | None = None) -> pd.DataFrame | None:
+def fetch_query(conn, query: str, params: dict | None = None) -> pd.DataFrame | None:
     """
-    Executes a SQL query against PostgreSQL via SQLAlchemy and returns a Pandas DataFrame.
+    Executes a SQL query against PostgreSQL using bulletproof named parameters.
     """
     try:
-        # Pandas handles the SQLAlchemy engine connection natively
+        if params is not None:
+            # Wrap the string to enable named parameter binding (e.g., :param_name)
+            query = text(query)
+            
         return pd.read_sql(query, con=conn, params=params)
     except Exception as e:
         st.error(f"Query Execution Error: {e}")

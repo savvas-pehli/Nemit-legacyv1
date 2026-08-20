@@ -31,7 +31,6 @@ selected_stations = st.multiselect("Please select Station/s:", sorted(stations),
 # TEMPORAL METADATA
 # ==============================================================================
 common_years = get_common_years(conn, selected_stations)
-st.write('sadasd')
 if common_years:
     sorted_years = np.sort(common_years)
     if has_stepsize_one(sorted_years) and len(common_years) > 1:

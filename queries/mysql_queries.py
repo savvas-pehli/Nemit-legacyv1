@@ -1,20 +1,24 @@
 # data/sql_queries.py (MySQL Version)
 
 # ==Fuel consumption Queries==
+GET_STATIONS_BY_REGIONS_QUERY = """
+SELECT "station" FROM new_stations_regions WHERE "region" IN ({region_placeholders});
+"""
+
 GET_FUEL_REGIONS_QUERY = """
-SELECT DISTINCT Region FROM prefecture_fuel_con; 
+SELECT DISTINCT "Region" FROM prefecture_fuel_con; 
 """
 
 GET_FUEL_PREFECTURES_BY_REGIONS_QUERY = """
-SELECT DISTINCT Prefecture FROM prefecture_fuel_con WHERE region IN {regions};
+SELECT DISTINCT "Prefecture" FROM prefecture_fuel_con WHERE "Region" IN {regions};
 """
 
 GET_ALL_FUEL_PREFECTURES_QUERY = """
-SELECT DISTINCT Prefecture FROM prefecture_fuel_con;
+SELECT DISTINCT "Prefecture" FROM prefecture_fuel_con;
 """
 
 GET_YEAR_RANGE_FUEL_QUERY = """
-SELECT min(year), max(year) FROM prefecture_fuel_con;
+SELECT min("Year"), max("Year") FROM prefecture_fuel_con;
 """
 
 GET_FUEL_COLUMNS_QUERY = """
@@ -35,20 +39,47 @@ WHERE {geography} IN {prefectures}
   AND Year between {start_year} and {end_year};
 """
 
-# == Region/Station Queries ==
+# == Pollution Queries ==
 GET_REGIONS_QUERY = """
-SELECT DISTINCT region FROM new_stations_regions; 
+SELECT DISTINCT "region" FROM new_stations_regions; 
 """
 
-GET_STATIONS_BY_REGIONS_QUERY = """
-SELECT station FROM new_stations_regions WHERE region IN {regions};
+GET_COMMON_YEARS_FOR_STATIONS = """
+SELECT "Year"
+FROM newyearstations
+WHERE "station" IN ({station_placeholders})
+GROUP BY "Year"
+HAVING COUNT(DISTINCT "station") = :station_count;
 """
 
 GET_ALL_STATIONS_QUERY = """
-SELECT station FROM new_stations_regions;
+SELECT "station" FROM new_stations_regions;
 """
 
-# == Column/Metadata ==
+GET_AGGREGATTED_DATA = """
+SELECT 
+    "Station",
+    {timeframe} AS record_datetime,
+    {gas_aggs}
+FROM "clean" 
+WHERE "Station" IN ({station_placeholders})
+  AND {year_condition}
+  AND "Month" BETWEEN :month_start AND :month_end
+  AND "day_of_week" BETWEEN :day_start AND :day_end
+GROUP BY "Station", "record_datetime"
+ORDER BY "record_datetime" ASC;
+"""
+
+GET_AIR_POLLUTION_DATA = """
+SELECT {columns}
+FROM "clean" 
+WHERE "Station" IN {stations}
+  AND {year_condition}
+  AND "Month" BETWEEN :month_start AND :month_end
+  AND "day_of_week" BETWEEN :day_start AND :day_end;
+"""
+
+# == UI queries ==
 GET_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
@@ -97,38 +128,13 @@ GET_DISTINCT_YEARS_QUERY = """
 SELECT DISTINCT "Year" FROM gas_econ_activity;
 """
 
-GET_COMMON_YEARS_FOR_STATIONS = """
-SELECT Year
-FROM newyearstations
-WHERE station IN {stations}
-GROUP BY Year
-HAVING COUNT(DISTINCT station) = {station_count};
-"""
+
 
 # == Data Extraction ==
 # FORCE INDEX (idx_stat_year_month_day)
-GET_AIR_POLLUTION_DATA = """
-SELECT {columns}
-FROM clean 
-WHERE Station IN {stations}
-  AND {year_condition}
-  AND Month BETWEEN {month_start} AND {month_end}
-  AND day_of_week BETWEEN {dow_start} AND {dow_end};
-"""
 
-GET_AGGREGATTED_DATA = """
-SELECT 
-    "Station",
-    {timeframe} AS record_datetime,
-    {gas}
-FROM "clean" 
-WHERE "Station" IN {stations}
-  AND {year_condition}
-  AND Month BETWEEN %s AND %s
-  AND day_of_week BETWEEN %s AND %s
-GROUP BY "Station", record_datetime
-ORDER BY record_datetime ASC;
-"""
+
+
 
 CHECK_GAS_VALIDITY = """
 SELECT COUNT(*) AS count
