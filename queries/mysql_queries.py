@@ -20,7 +20,7 @@ SELECT min(year), max(year) FROM prefecture_fuel_con;
 GET_FUEL_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = DATABASE()
+WHERE table_schema = current_database()
   AND table_name = 'prefecture_fuel_con'
   AND column_name NOT IN (
     'Year','Prefecture','Region',
@@ -52,7 +52,7 @@ SELECT station FROM new_stations_regions;
 GET_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = DATABASE()
+WHERE table_schema = current_database()
   AND table_name = 'clean'
   AND column_name NOT IN (
     'year','municipality','Hour','Date','station','region',
@@ -63,7 +63,7 @@ WHERE table_schema = DATABASE()
 GET_CHORO_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = DATABASE()
+WHERE table_schema = current_database()
   AND table_name = 'clean'
   AND column_name NOT IN (
     'year','municipality','Hour','Date','station','region','CO mg/m^3','NO mug/m^3','Benz mug/m^3',
@@ -74,27 +74,27 @@ WHERE table_schema = DATABASE()
 GET_AIR_POLLUTANTS_FOR_TABLE = """
 SELECT COLUMN_NAME
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = DATABASE()
+WHERE TABLE_SCHEMA = current_database()
   AND TABLE_NAME = '{table_name}'
   AND COLUMN_NAME NOT IN ({excluded_columns});
 """
 
 # == Economic Activity ==
 GET_ECONOMIC_ACTIVITIES_QUERY = """
-SELECT DISTINCT `economic activity`, `code name`
+SELECT DISTINCT "economic activity", "code name"
 FROM gas_econ_activity
-WHERE CHAR_LENGTH(`code name`) < 2;
+WHERE CHAR_LENGTH("code name") < 2;
 """
 
 GET_SUB_ECONOMIC_ACTIVITIES_QUERY = """
-SELECT DISTINCT `economic activity`
+SELECT DISTINCT "economic activity"
 FROM gas_econ_activity
-WHERE `code name` REGEXP '^[{code_names}]' AND CHAR_LENGTH(`code name`) > 1;
+WHERE "code name" REGEXP '^[{code_names}]' AND CHAR_LENGTH("code name") > 1;
 """
 
 # == Years ==
 GET_DISTINCT_YEARS_QUERY = """
-SELECT DISTINCT `Year` FROM gas_econ_activity;
+SELECT DISTINCT "Year" FROM gas_econ_activity;
 """
 
 GET_COMMON_YEARS_FOR_STATIONS = """
@@ -118,15 +118,15 @@ WHERE Station IN {stations}
 
 GET_AGGREGATTED_DATA = """
 SELECT 
-    Station,
+    "Station",
     {timeframe} AS record_datetime,
     {gas}
-FROM clean 
-WHERE Station IN {stations}
+FROM "clean" 
+WHERE "Station" IN {stations}
   AND {year_condition}
-  AND Month BETWEEN {month_start} AND {month_end}
-  AND day_of_week BETWEEN {dow_start} AND {dow_end}
-GROUP BY Station, record_datetime
+  AND Month BETWEEN %s AND %s
+  AND day_of_week BETWEEN %s AND %s
+GROUP BY "Station", record_datetime
 ORDER BY record_datetime ASC;
 """
 
@@ -137,18 +137,18 @@ WHERE Station IN {stations}
   AND {year_condition}
   AND Month BETWEEN {month_start} AND {month_end}
   AND day_of_week BETWEEN {dow_start} AND {dow_end}
-  AND `{gas}` IS NOT NULL;
+  AND "{gas}" IS NOT NULL;
 """
 
 # == Choropleth ==
 CHOROPLETH_HOURLY_YEARLY_QUERY = """
-SELECT year, Hour, municipality, `{air_pollutant}` 
+SELECT year, Hour, municipality, "{air_pollutant}" 
 FROM aggr_choro_per_hour_year
 WHERE region = {region};
 """
 
 CHOROPLETH_YEARLY_QUERY = """
-SELECT year, municipality, `{air_pollutant}` 
+SELECT year, municipality, "{air_pollutant}" 
 FROM aggr_choro_per_year
 WHERE region = {region};
 """
@@ -161,29 +161,29 @@ WHERE Municipality IN ({municipalities});
 # ECONOMIC ACTIVITY
 AIR_POL_QUERY = """
 SELECT column_name FROM information_schema.columns 
-WHERE table_schema = DATABASE()
+WHERE table_schema = current_database()
   AND table_name = 'gas_econ_activity' 
   AND column_name NOT IN ('code name','year','economic activity');
 """
                    
 MAIN_ECON_ACTIVITY = """
-SELECT DISTINCT `economic activity`, `code name` 
+SELECT DISTINCT "economic activity", "code name" 
 FROM gas_econ_activity 
-WHERE CHAR_LENGTH(`code name`) < 2;
+WHERE CHAR_LENGTH("code name") < 2;
 """
 
 SUB_ECON_QUERY = """
-SELECT DISTINCT `economic activity` 
+SELECT DISTINCT "economic activity" 
 FROM gas_econ_activity
-WHERE TRIM(`code name`) LIKE CONCAT('{code_name_regex}', '%') 
-  AND LENGTH(TRIM(`code name`)) > 1;
+WHERE TRIM("code name") LIKE CONCAT('{code_name_regex}', '%') 
+  AND LENGTH(TRIM("code name")) > 1;
 """
 
 ECON_ACTIVITY_QUERY = """
-SELECT `year`, `economic activity`, `{air_pollutant}` 
+SELECT "year", "economic activity", "{air_pollutant}" 
 FROM gas_econ_activity 
-WHERE `economic activity` IN {econ_act_query} 
-  AND `year` BETWEEN {start} AND {end};
+WHERE "economic activity" IN {econ_act_query} 
+  AND "year" BETWEEN {start} AND {end};
 """
 
 # =====LIMANI Queries=======
@@ -196,7 +196,7 @@ FROM
 WHERE 
     EXTRACT(YEAR FROM Datetime) BETWEEN {year_range[0]} AND {year_range[1]}
     AND EXTRACT(MONTH FROM Datetime) BETWEEN {month_range[0]} AND {month_range[1]}
-    AND WEEKDAY(Datetime) BETWEEN {day_range[0]} AND {day_range[1]}
+    AND EXTRACT(ISODOW FROM Datetime BETWEEN {day_range[0]} AND {day_range[1]}
 GROUP BY time_bucket
 ORDER BY time_bucket ASC;
 """
@@ -220,7 +220,7 @@ LIMIT 1;
     
 PORT_GET_TIME_BOUNDARIES_QUERY = """
 SELECT 
-    MIN(`{time_col}`) AS min_time,
-    MAX(`{time_col}`) AS max_time
+    MIN("{time_col}") AS min_time,
+    MAX("{time_col}") AS max_time
 FROM thess_port_assesment.{table_name};
 """

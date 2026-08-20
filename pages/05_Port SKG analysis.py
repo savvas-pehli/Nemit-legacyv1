@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.db_conn import get_db_connection
+from utils.db_conn import get_database_engine
 from services.port_services import get_port_metadata, fetch_aggregated_port_data
 from utils.plotting import localized_dual_axis_chart
 from utils.constants import MONTHS_LIST,MONTH_MAP,DAYS_LIST,DAYS_MAP, VALID_TABLES
@@ -9,7 +9,7 @@ st.title("Localized Environmental Analytics")
 st.markdown("---")
 
 
-conn = get_db_connection()
+conn = get_database_engine()
 # ==============================================================================
 # PRIMARY FILTERS (Triggers Schema Update)
 # ==============================================================================

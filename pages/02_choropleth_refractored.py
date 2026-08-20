@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.db_conn import get_db_connection
+from utils.db_conn import get_database_engine
 from utils.translation_helper import greek_to_latin
 from services.choroplet_services import (
     get_cached_choro_columns,
@@ -22,7 +22,7 @@ if st.sidebar.button("🔄 Force Refresh Data", type="primary"):
     st.sidebar.success("Cache wiped. The next query will hit the database.")
 st.sidebar.markdown("---")
 
-conn = get_db_connection()
+conn = get_database_engine()
 
 # ==============================================================================
 # UI FILTERS & METADATA

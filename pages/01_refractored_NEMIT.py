@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-from utils.db_conn import get_db_connection
+from utils.db_conn import get_database_engine
 from utils.processing import has_stepsize_one
 from utils.plotting import dynamic_groupby_bar_chart
 from utils.UI import get_cached_regions, get_cached_gases
@@ -13,7 +13,7 @@ from services.pollution_services import (
 st.set_page_config(layout="wide", page_title="Pollution Data Dashboard")
 st.title('Environmental gas measurements')
 st.sidebar.title('Time and gas filters')
-conn = get_db_connection()
+conn = get_database_engine()
 
 # ==============================================================================
 # GEOGRAPHY METADATA
@@ -31,7 +31,7 @@ selected_stations = st.multiselect("Please select Station/s:", sorted(stations),
 # TEMPORAL METADATA
 # ==============================================================================
 common_years = get_common_years(conn, selected_stations)
-
+st.write('sadasd')
 if common_years:
     sorted_years = np.sort(common_years)
     if has_stepsize_one(sorted_years) and len(common_years) > 1:

@@ -2,41 +2,33 @@
 
 import streamlit as st
 #from typing import Any
-import os 
-import duckdb
 import pandas as pd
 import logging
-
+from sqlalchemy import create_engine
 logger = logging.getLogger(__name__)
 
 @st.cache_resource
-def get_db_connection():
-    """Returns a cached SQL connection using credentials from Streamlit secrets."""
-    token = None
-    if "token" in st.secrets['motherduck']:
-        creds= st.secrets["motherduck"]
-        token=creds['token']
-    else:
-        token = os.getenv("MOTHERDUCK_TOKEN")
-
-    if not token:
-        msg = "CRITICAL: MotherDuck token is missing. Pipeline halted."
-        st.error(msg)
-        logger.error(msg)
-        st.stop()
-        
-        
-    target_database='my_db'
+def get_database_engine():
+    """
+    Initializes a production-grade connection pool.
+    This runs exactly once and is shared across all Streamlit sessions.
+    """
+    # 1. Fetch credentials securely from Streamlit secrets
+    db_config = st.secrets["connections"]["postgresql_docker"]
     
-    try:
-        # Connecting directly to the cloud database using the resolved token
-        logger.info(f"Establishing cloud connection to MotherDuck database: {target_database}")
-        conn = duckdb.connect(f'md:{target_database}?motherduck_token={token}')
-        return conn
-    except Exception as e:
-        logger.critical(f"Cloud Connection Failed on DB {target_database}: {str(e)}", exc_info=True)
-        st.error(f"Cloud Connection Failed: {e}")
-        st.stop()
+    # 2. Construct the connection string dynamically
+    db_url = f"{db_config['dialect']}+{db_config['driver']}://{db_config['username']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+    
+    # 3. Create the Engine with production safety guards
+    engine = create_engine(
+        db_url,
+        pool_size=5,          # Keep 5 connections permanently open
+        max_overflow=10,      # Allow up to 10 extra connections during traffic spikes
+        pool_pre_ping=True,   # Pings the DB before every query to ensure the connection hasn't died
+        pool_recycle=3600     # Refresh connections every hour to prevent silent timeouts
+    )
+    
+    return engine
 
 def quote(value: str) -> str:
     """Wraps a string safely for SQL usage."""
@@ -56,20 +48,13 @@ def column_name_transform(values:list[str])-> list:
     return f"({', '.join(quote(v) for v in values)})"
 
 
-def fetch_query(conn, query: str, params: tuple | list | None = None) -> pd.DataFrame | None:
+def fetch_query(conn, query: str, params: tuple | list | dict | None = None) -> pd.DataFrame | None:
     """
-    Executes a SQL query against MotherDuck and returns a Pandas DataFrame.
-    Supports secure parameter binding for dynamic WHERE clauses.
-    DuckDB handles this conversion natively and highly efficiently.
+    Executes a SQL query against PostgreSQL via SQLAlchemy and returns a Pandas DataFrame.
     """
     try:
-        # If parameters are provided, pass them to the execution engine
-        if params:
-            return conn.execute(query, params).df()
-        
-        # Fallback for static queries without parameters
-        return conn.execute(query).df()
-        
+        # Pandas handles the SQLAlchemy engine connection natively
+        return pd.read_sql(query, con=conn, params=params)
     except Exception as e:
         st.error(f"Query Execution Error: {e}")
         return None

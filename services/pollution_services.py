@@ -1,5 +1,6 @@
 import pandas as pd
 from utils.db_conn import fetch_query
+import streamlit as st
 from queries.sql_queries import (
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,
@@ -11,8 +12,9 @@ def get_stations_by_regions(_conn, regions: list) -> list:
     if not regions:
         df = fetch_query(_conn, GET_ALL_STATIONS_QUERY)
     else:
-        placeholders = ", ".join(["?"] * len(regions))
+        placeholders = ", ".join(["%s"] * len(regions))
         query = GET_STATIONS_BY_REGIONS_QUERY.format(placeholders=placeholders)
+        
         df = fetch_query(_conn, query, params=tuple(regions))
         
     if df is not None and not df.empty:
@@ -25,13 +27,14 @@ def get_common_years(_conn, stations: list) -> list:
     
     # The database stores stations in uppercase based on your original logic
     upper_stations = [s.upper() for s in stations]
-    placeholders = ", ".join(["?"] * len(upper_stations))
-    
+    placeholders = ", ".join(["%s"] * len(upper_stations))
+    st.write(placeholders)
     query = GET_COMMON_YEARS_FOR_STATIONS.format(placeholders=placeholders)
-    # The last parameter is for the HAVING COUNT() = ?
+    # The last parameter is for the HAVING COUNT() = %s
     params = tuple(upper_stations) + (len(upper_stations),)
     
     df = fetch_query(_conn, query, params=params)
+    st.write(f"executed query: {query} with params: {params}")  # Debugging line
     if df is not None and not df.empty:
         return df['Year'].tolist()
     return []
@@ -57,22 +60,22 @@ def fetch_aggregated_pollution_data(
         "Day": "EXTRACT(ISODOW FROM record_datetime)",
         "Hour": "EXTRACT(HOUR FROM record_datetime)"
     }
-    sql_agg = {"Mean": "AVG", "Median": "MEDIAN"}
+    sql_agg = {"Mean": "AVG({gas})", "Median": "percentile_cont(0.5) WITHIN GROUP (ORDER BY {gas})"}
     
     timeframe_expr = sql_timeframe.get(timeframe)
-    gas_aggs = ', '.join([f'{sql_agg[agg_method]}("{gas}") AS "{gas}"' for gas in gases])
+    gas_aggs = ', '.join([f'{sql_agg[agg_method].format(gas=f"{gas}")} AS "{gas}"' for gas in gases])
     
     # 3. Parameter Binding Preparation
     upper_stations = [s.upper() for s in stations]
-    station_placeholders = ", ".join(["?"] * len(upper_stations))
+    station_placeholders = ", ".join(["%s"] * len(upper_stations))
     params = tuple(upper_stations)
     
     # Year Logic handling (Between vs IN)
     if isinstance(year_range, tuple):
-        year_condition_expr = "Year BETWEEN ? AND ?"
+        year_condition_expr = "Year BETWEEN %s AND %s"
         params += (year_range[0], year_range[1])
     else:
-        year_placeholders = ", ".join(["?"] * len(year_range))
+        year_placeholders = ", ".join(["%s"] * len(year_range))
         year_condition_expr = f"Year IN ({year_placeholders})"
         params += tuple(year_range)
         

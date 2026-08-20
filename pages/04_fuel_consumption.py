@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.db_conn import get_db_connection
+from utils.db_conn import get_database_engine
 from utils.processing import check_region, check_prefecture
 from services.fuel_services import (
     get_cached_regions, 
@@ -16,7 +16,7 @@ st.title("Fuel Consumption Analytics")
 st.sidebar.title('Time and Gas Filters')
 
 # 1. Establish Cached Resource Connection
-conn = get_db_connection()
+conn = get_database_engine()
 
 # 2. Fetch from Cache (Instantaneous)
 regions = get_cached_regions(conn)

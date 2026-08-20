@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import plotly.express as px
-from utils.db_conn import get_db_connection
+from utils.db_conn import get_database_engine
 from services.econ_services import (
     get_cached_years,
     get_cached_pollutants,
@@ -22,7 +22,7 @@ if st.sidebar.button("🔄 Force Refresh Data", type="primary"):
     st.sidebar.success("Cache wiped. The next query will hit the database.")
 st.sidebar.markdown("---")
 
-conn = get_db_connection()
+conn = get_database_engine()
 
 # ==============================================================================
 # METADATA RETRIEVAL

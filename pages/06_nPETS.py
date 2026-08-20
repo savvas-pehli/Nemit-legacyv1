@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.db_conn import get_db_connection
+from utils.db_conn import get_database_engine
 from services.npets_service import get_npets_schema, fetch_aggregated_npets_data
 from utils.plotting import plot_particle_distribution
 import pandas as pd
@@ -18,7 +18,7 @@ TIMEFRAMES = ["Day", "Hour"]
 PLACE_MAPPING = {"SKG Airport": 'Airport', "SKG Port": 'Port', "SKG CERTH": 'Background', "SKG AUTH Main Road": 'Road'}
 
 # Initialize Database Connection
-conn = get_db_connection()
+conn = get_database_engine()
 
 # ==============================================================================
 # 1. PRIMARY FILTERS (Triggers Schema Update)
