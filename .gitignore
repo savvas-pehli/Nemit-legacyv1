@@ -15,6 +15,7 @@ __pycache__/
 # Never push secrets or local config
 .streamlit/secrets.toml
 .streamlit/config.toml
+architecture_bluprint_file.py
 
 # 4. Data Storage & Models (Often large and temporary)
 # You generally shouldn't commit large data files or models unless using Git LFS.
