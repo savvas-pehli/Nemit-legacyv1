@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils.db_conn import fetch_query
-from queries.sql_queries import (
+from queries.mysql_queries import (
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,
     GET_ALL_STATIONS_QUERY,
@@ -24,7 +24,8 @@ def get_stations_by_regions(_conn, regions: list) -> list:
         df = fetch_query(_conn, query, params=params)
         
     if df is not None and not df.empty:
-        return [station.capitalize() for station in df['station'].tolist()]
+        # RETURN RAW STRINGS. DO NOT MUTATE.
+        return df['station'].tolist() 
     return []
 
 
@@ -41,7 +42,6 @@ def get_common_years(_conn, stations: list) -> list:
         station_placeholders.append(f":{key}")
         params[key] = station
         
-    st.write(station_placeholders)
     query = GET_COMMON_YEARS_FOR_STATIONS.format(station_placeholders=", ".join(station_placeholders))
     df = fetch_query(_conn, query, params=params)
     
@@ -91,7 +91,8 @@ def fetch_aggregated_pollution_data(
         
     # Strict Year Mapping
     if isinstance(year_range, tuple):
-        year_condition_expr = '"year" BETWEEN :year_start AND :year_end'
+        # Enforce exact case matching with PostgreSQL schema ("Year")
+        year_condition_expr = '"Year" BETWEEN :year_start AND :year_end'
         params["year_start"] = year_range[0]
         params["year_end"] = year_range[1]
     else:
@@ -100,7 +101,8 @@ def fetch_aggregated_pollution_data(
             key = f"yr_{i}"
             year_placeholders.append(f":{key}")
             params[key] = yr
-        year_condition_expr = f'"year" IN ({", ".join(year_placeholders)})'
+        # Enforce exact case matching with PostgreSQL schema ("Year")
+        year_condition_expr = f'"Year" IN ({", ".join(year_placeholders)})'
         
     query = GET_AGGREGATTED_DATA.format(
         timeframe=timeframe_expr,
@@ -108,5 +110,6 @@ def fetch_aggregated_pollution_data(
         station_placeholders=", ".join(stat_placeholders),
         year_condition=year_condition_expr
     )
-    
+    st.write(f"Executing Query: {query}")  # Debugging line to show the final query
+    st.write(f"With Parameters: {params}")  # Debugging line to show the
     return fetch_query(_conn, query, params=params)

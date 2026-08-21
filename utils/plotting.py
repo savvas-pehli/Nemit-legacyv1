@@ -91,7 +91,7 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
                 )
                               )
             offsetgroup += 1
-    
+    st.write(gases_for_context)
     if not fig.data:
             st.warning("No data traces were added to the plot. Check selected gases, stations, and aggregated data.")
             return
@@ -204,7 +204,7 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
                     
     
         layout_args["title"] = ''
-
+    st.write('final pass')
     fig.update_layout(**layout_args)
     st.plotly_chart(fig, width='stretch')
     

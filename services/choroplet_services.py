@@ -1,7 +1,7 @@
 import pandas as pd
 from utils.db_conn import fetch_query
 from utils.translation_helper import greek_to_latin
-from queries.sql_queries import (
+from queries.mysql_queries import (
     GET_CHORO_GAS_COLUMNS_QUERY,
     CHOROPLETH_YEARLY_QUERY,
     CHOROPLETH_HOURLY_YEARLY_QUERY,

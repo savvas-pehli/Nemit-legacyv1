@@ -66,8 +66,8 @@ WHERE "Station" IN ({station_placeholders})
   AND {year_condition}
   AND "Month" BETWEEN :month_start AND :month_end
   AND "day_of_week" BETWEEN :day_start AND :day_end
-GROUP BY "Station", "record_datetime"
-ORDER BY "record_datetime" ASC;
+GROUP BY "Station", record_datetime
+ORDER BY record_datetime ASC;
 """
 
 GET_AIR_POLLUTION_DATA = """
@@ -83,11 +83,11 @@ WHERE "Station" IN {stations}
 GET_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = current_database()
+WHERE table_schema = 'public'
   AND table_name = 'clean'
   AND column_name NOT IN (
-    'year','municipality','Hour','Date','station','region',
-    'Month','Day','day_of_week','record_datetime','id'
+    'Year','municipality','Hour','Date','station','Region',
+    'Month','Day','day_of_week','record_datetime','id','Station'
   );
 """
 
@@ -95,10 +95,10 @@ GET_CHORO_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
 WHERE table_schema = current_database()
-  AND table_name = 'clean'
+  AND table_name = "clean"
   AND column_name NOT IN (
-    'year','municipality','Hour','Date','station','region','CO mg/m^3','NO mug/m^3','Benz mug/m^3',
-    'Month','Day','day_of_week','record_datetime','id'
+    "year","municipality","Hour","Date","station","region","CO mg/m^3","NO mug/m^3","Benz mug/m^3",
+    "Month","Day","day_of_week","record_datetime","id"
   );
 """
 

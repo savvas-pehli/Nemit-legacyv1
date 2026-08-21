@@ -1,8 +1,8 @@
 import streamlit as st
 from utils.db_conn import fetch_query
-from queries.sql_queries import GET_REGIONS_QUERY, GET_GAS_COLUMNS_QUERY,PORT_TIME_COLUMN_QUERY,PORT_COLUMNS_QUERY
+from queries.mysql_queries import GET_REGIONS_QUERY, GET_GAS_COLUMNS_QUERY,PORT_TIME_COLUMN_QUERY,PORT_COLUMNS_QUERY
 import pandas as pd
-from queries.sql_queries import PORT_GET_TIME_BOUNDARIES_QUERY
+from queries.mysql_queries import PORT_GET_TIME_BOUNDARIES_QUERY
 
 # ttl=86400 means the cache lives for 24 hours. 
 # It hits MotherDuck ONCE a day, costing you fractions of a penny.
@@ -19,6 +19,7 @@ def get_cached_gases(_conn):
     if df is not None and not df.empty:
         return df['column_name'].tolist()
     return []
+
 @st.cache_data(ttl=86400)
 def get_port_time_column_metadata(_conn, table_name):
     """
