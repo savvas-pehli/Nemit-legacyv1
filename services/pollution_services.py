@@ -1,7 +1,7 @@
-import streamlit as st
 import pandas as pd
+from sqlalchemy import text
 from utils.db_conn import fetch_query
-from queries.mysql_queries import (
+from queries.postegre_queries import (
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,
     GET_ALL_STATIONS_QUERY,
@@ -110,6 +110,4 @@ def fetch_aggregated_pollution_data(
         station_placeholders=", ".join(stat_placeholders),
         year_condition=year_condition_expr
     )
-    st.write(f"Executing Query: {query}")  # Debugging line to show the final query
-    st.write(f"With Parameters: {params}")  # Debugging line to show the
     return fetch_query(_conn, query, params=params)

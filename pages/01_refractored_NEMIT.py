@@ -94,7 +94,6 @@ if st.button("Run Query", type="primary"):
 
         if has_value:
             st.success("Data Loaded Successfully")
-            st.dataframe(grouped_df.head(10), use_container_width=True)
-            #dynamic_groupby_bar_chart(grouped_df, selected_gases, timeframe)
+            dynamic_groupby_bar_chart(grouped_df, selected_gases, timeframe)
         else:
             st.warning("No data found for the selected filter combination.")

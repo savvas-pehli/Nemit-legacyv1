@@ -1,6 +1,6 @@
 import pandas as pd
 from utils.db_conn import fetch_query
-from queries.mysql_queries import (
+from queries.postegre_queries import (
     AIR_POL_QUERY,
     MAIN_ECON_ACTIVITY,
     GET_DISTINCT_YEARS_QUERY,

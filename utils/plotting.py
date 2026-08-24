@@ -2,7 +2,7 @@ import plotly.express as px
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
-
+import json
 def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     co_max = gdf[column].max()
     pollutant_name, measurement_unit = column.split(" ", 1)
@@ -10,6 +10,32 @@ def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     gdf["tooltip_label"] = gdf[column].apply(lambda x: "No data" if x == -1 else f"{x:.4f}")
     pollutant_name=column.split(" ")[0]
     measurement_unit=column.split(" ")[1]
+    
+    gdf["municipality"] = gdf["municipality"].str.upper()
+    geojson["Municipality"] = geojson["Municipality"].str.upper()
+    geojson = geojson.set_index("Municipality")
+    geo_dict = json.loads(geojson.to_json())
+    
+    all_times = sorted(gdf[ani_frame].dropna().unique())
+    all_places = list(geojson.index)
+    
+    # Build the theoretical complete matrix
+    grid = pd.MultiIndex.from_product(
+        [all_times, all_places], 
+        names=[ani_frame, 'municipality']
+    ).to_frame(index=False)
+    
+    # Left merge the actual data onto the complete grid
+    gdf = pd.merge(grid, gdf, on=[ani_frame, 'municipality'], how='left')
+    
+    # Fill gaps with -1 to trigger the custom "No data" tooltip, and sort chronologically
+    gdf[column] = gdf[column].fillna(-1)
+    gdf = gdf.sort_values(by=[ani_frame, 'municipality'])
+    # =====================================================================
+
+    # 2. Tooltip Generation (Must happen AFTER the Cartesian expansion)
+    gdf["tooltip_label"] = gdf[column].apply(lambda x: "No data" if x == -1 else f"{x:.4f}")
+    
     if ani_frame == 'Hour':
         gdf["tooltip_data"] = gdf.apply(
             lambda row: f"Hour: {row['Hour']}<br>Municipality of {row['municipality']}<br>Air Pollutant: {pollutant_name}<br>Value of air pollutant in {measurement_unit}: {row['tooltip_label']}",
@@ -19,14 +45,13 @@ def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
             lambda row: f"Year: {row['Year']}<br>Municipality of {row['municipality']}<br>Air Pollutant: {pollutant_name}<br>Value of air pollutant in {measurement_unit}: {row['tooltip_label']}",
             axis=1)
 
-
+    
     fig = px.choropleth_mapbox(
         gdf,
-        geojson=geojson,
+        geojson=geo_dict,
         color=column,
         animation_frame=ani_frame,
         locations="municipality",
-        featureidkey="id",
         mapbox_style="open-street-map",
         color_continuous_scale=[(0, "rgba(128,128,128,0.01)"), (0.01, "blue"), (1, "#006600")],
         zoom=8,
@@ -51,7 +76,8 @@ def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     fig.update_traces(marker_line_width=1, marker_line_color='black')
     fig.update_geos(fitbounds="locations", visible=False)
     fig.update_layout(height=600, width=1000)
-    st.plotly_chart(fig, theme='streamlit', width='stretch')
+        
+    st.plotly_chart(fig, theme='streamlit', width='stretch',config={'displayModeBar': False})
 
 def dynamic_groupby_bar_chart(df, gases, timeframe):
     months = [
@@ -73,11 +99,9 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
     
     stations_num={1:'station',2:'stations',3:'stations'}
 
-    #st.write(stations_num[number_of_locations])
     offsetgroup = 0
     number_of_gases_for_context=len(gases)
     gases_for_context=list(set(gases) & set(gas_info_dict.keys()))
-    #st.write(gases)
     for idx, gas in enumerate(gases):
         for station in locations:
             station_data = df[df['Station'] == station]
@@ -91,7 +115,7 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
                 )
                               )
             offsetgroup += 1
-    st.write(gases_for_context)
+    #st.write(gases_for_context)
     if not fig.data:
             st.warning("No data traces were added to the plot. Check selected gases, stations, and aggregated data.")
             return
@@ -204,7 +228,6 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
                     
     
         layout_args["title"] = ''
-    st.write('final pass')
     fig.update_layout(**layout_args)
     st.plotly_chart(fig, width='stretch')
     

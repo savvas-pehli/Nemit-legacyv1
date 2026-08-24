@@ -2,7 +2,7 @@
 import streamlit as st
 from utils.db_conn import fetch_query
 from utils.constants import VALID_FUEL_TABLES
-from queries.mysql_queries import (
+from queries.postegre_queries import (
     GET_FUEL_REGIONS_QUERY,
     GET_ALL_FUEL_PREFECTURES_QUERY,
     GET_FUEL_COLUMNS_QUERY,

@@ -1,7 +1,8 @@
 import pandas as pd
 from utils.db_conn import fetch_query
 from utils.translation_helper import greek_to_latin
-from queries.mysql_queries import (
+import streamlit as st
+from queries.postegre_queries import (
     GET_CHORO_GAS_COLUMNS_QUERY,
     CHOROPLETH_YEARLY_QUERY,
     CHOROPLETH_HOURLY_YEARLY_QUERY,
@@ -25,20 +26,23 @@ def get_cached_geometric_data(_conn, region: str, raw_municipalities: list) -> p
         
     # Translate and get unique IDs
     municipality_ids = list(set([greek_to_latin(m) for m in raw_municipalities]))
-    
     table_name = region.replace(" ", "_")
-    placeholders = ", ".join(["?"] * len(municipality_ids))
-    
+    params = {}
+    ph_list = []
+    for i, muni in enumerate(municipality_ids):
+        key = f"muni_{i}"
+        ph_list.append(f":{key}")
+        params[key] = muni
+        
     query = GEOMETRIC_DATA_LOAD.format(
         table=table_name,
-        placeholders=placeholders
+        municipalities=", ".join(ph_list)
     )
-    
-    return fetch_query(_conn, query, params=tuple(municipality_ids))
+    return fetch_query(_conn, query, params=params)
 
 def fetch_choropleth_data(_conn, region: str, pollutant: str, timeframe: str, valid_pollutants: list) -> pd.DataFrame:
     """
-    Executes the analytical query using structural validation and true parameterization.
+    Executes the analytical query using structural validation and true dictionary parameterization.
     """
     if pollutant not in valid_pollutants:
         raise ValueError("Security Alert: Invalid pollutant identifier")
@@ -48,8 +52,9 @@ def fetch_choropleth_data(_conn, region: str, pollutant: str, timeframe: str, va
         query_template = CHOROPLETH_YEARLY_QUERY
     else:
         query_template = CHOROPLETH_HOURLY_YEARLY_QUERY
-        
+    
+    # 1. Inject the column name (Structural formatting)
     query = query_template.format(air_pollutant=pollutant)
     
-    # Execute with true parameter binding for the region
-    return fetch_query(_conn, query, params=(region,))
+    # 2. Execute with strict dictionary binding (Data formatting)
+    return fetch_query(_conn, query, params={"region": region})

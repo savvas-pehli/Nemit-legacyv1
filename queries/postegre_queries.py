@@ -59,15 +59,15 @@ SELECT "station" FROM new_stations_regions;
 GET_AGGREGATTED_DATA = """
 SELECT 
     "Station",
-    {timeframe} AS record_datetime,
+    {timeframe} AS "record_datetime",
     {gas_aggs}
 FROM "clean" 
 WHERE "Station" IN ({station_placeholders})
-  AND {year_condition}
+  AND "Year" BETWEEN :year_start AND :year_end
   AND "Month" BETWEEN :month_start AND :month_end
   AND "day_of_week" BETWEEN :day_start AND :day_end
-GROUP BY "Station", record_datetime
-ORDER BY record_datetime ASC;
+GROUP BY 1, 2
+ORDER BY 2 ASC;
 """
 
 GET_AIR_POLLUTION_DATA = """
@@ -94,11 +94,11 @@ WHERE table_schema = 'public'
 GET_CHORO_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = current_database()
-  AND table_name = "clean"
+WHERE table_schema = 'public'
+  AND table_name = 'clean'
   AND column_name NOT IN (
-    "year","municipality","Hour","Date","station","region","CO mg/m^3","NO mug/m^3","Benz mug/m^3",
-    "Month","Day","day_of_week","record_datetime","id"
+    'Year','municipality','Hour','Date','Station','region','CO mg/m^3','NO mug/m^3','Benz mug/m^3',
+    'Month','Day','day_of_week','record_datetime','id'
   );
 """
 
@@ -148,20 +148,20 @@ WHERE Station IN {stations}
 
 # == Choropleth ==
 CHOROPLETH_HOURLY_YEARLY_QUERY = """
-SELECT year, Hour, municipality, "{air_pollutant}" 
-FROM aggr_choro_per_hour_year
-WHERE region = {region};
+SELECT "Year", "Hour", "municipality", "{air_pollutant}" 
+FROM "aggr_choro_per_hour_year"
+WHERE "Region" = :region;
 """
 
 CHOROPLETH_YEARLY_QUERY = """
-SELECT year, municipality, "{air_pollutant}" 
-FROM aggr_choro_per_year
-WHERE region = {region};
+SELECT "Year", "municipality", "{air_pollutant}" 
+FROM "aggr_choro_per_year"
+WHERE "Region" = :region;
 """
 
 GEOMETRIC_DATA_LOAD = """
-SELECT * from my_db.geometries.{table}_municipalities
-WHERE Municipality IN ({municipalities});
+SELECT * from public.{table}_municipalities
+WHERE "Municipality" IN ({municipalities});
 """
 
 # ECONOMIC ACTIVITY

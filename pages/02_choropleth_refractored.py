@@ -44,7 +44,6 @@ if not valid_pollutants:
     st.stop()
     
 selected_col = st.selectbox("Please select air pollutant", sorted(valid_pollutants))
-
 # ==============================================================================
 # DATA EXTRACTION
 # ==============================================================================
@@ -59,7 +58,6 @@ if raw_gdf is None or raw_gdf.empty:
 # GEOMETRY EXTRACTION
 # ==============================================================================
 raw_geo_df = get_cached_geometric_data(conn, region, raw_gdf['municipality'].tolist())
-
 if raw_geo_df is not None and not raw_geo_df.empty:
     geodata = load_geo_original_data(raw_geo_df)
 else:
@@ -96,7 +94,6 @@ if st.button("Generate Spatial Map", type="primary"):
             # Apply translation strictly on the finalized dataframe
             processed_df['municipality'] = processed_df['municipality'].apply(greek_to_latin)
             ani_frame = timeframe_options[selected_timeframe]["frame"]
-            
             choropleth_mapbox(processed_df, geodata, selected_col, region, ani_frame)
             
         except Exception as e:
