@@ -2,7 +2,6 @@ import streamlit as st
 from utils.db_conn import fetch_query
 from queries.postegre_queries import GET_REGIONS_QUERY, GET_GAS_COLUMNS_QUERY,PORT_TIME_COLUMN_QUERY,PORT_COLUMNS_QUERY
 import pandas as pd
-from queries.postegre_queries import PORT_GET_TIME_BOUNDARIES_QUERY
 
 # ttl=86400 means the cache lives for 24 hours. 
 # It hits MotherDuck ONCE a day, costing you fractions of a penny.

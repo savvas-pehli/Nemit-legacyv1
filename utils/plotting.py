@@ -284,7 +284,7 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
 
     if len(fuels) == 1:
         #layout_args["yaxis"] = {"title": fuels[0]}
-        layout_args["yaxis"] = {"title": fuels[0]}# Single Y-axis case
+        layout_args["yaxis"] = {"title": f"{fuels[0]} (metric tons)"}# Single Y-axis case
         layout_args["annotations"] = [
             dict(
             x=0.5,  # Center the text
@@ -301,10 +301,10 @@ def fuel_con_groupby_bar_chart(df,area,fuels, timeframe='Year'):
         layout_args["title"] = ''
     elif len(fuels) > 1:
         locations=' , '.join([name.replace("_"," ")for name in locations])
-        layout_args["yaxis"] = {"title": fuels[0]}
+        layout_args["yaxis"] = {"title": f"{fuels[0]} (metric tons)"}
         layout_args["title"]=f"fuel consumption for {places_num[number_of_locations]} {locations} of {fuels[0]}"
         layout_args["yaxis2"] = {
-                     "title": fuels[1],
+                     "title": f"{fuels[1]} (metric tons)",
                      "overlaying": "y",  # Overlay on primary y-axis
                      "side": "right",
                      "showgrid": False

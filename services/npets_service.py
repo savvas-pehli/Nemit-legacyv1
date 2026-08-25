@@ -1,6 +1,11 @@
 import pandas as pd
 import streamlit as st
-from utils.db_conn import format_in_clause
+from utils.db_conn import fetch_query, format_in_clause
+from queries.postegre_queries import (
+    NPETS_SCHEMA_QUERY,
+    NPETS_AGGREGATED_DATA_QUERY,
+    NPETS_TEMPORAL_METADATA_QUERY
+)
 # ==============================================================================
 # CONFIGURATION & WHITELISTS (Decoupling logic from the UI)
 # ==============================================================================
@@ -10,36 +15,32 @@ VALID_TOOLS = {
     "METADATA": "metadata"
 }
 
-# MySQL-compliant time extraction
-DUCKDB_TIMEFRAME = {
-    "Day": "(EXTRACT(ISODOW FROM f.Datetime) - 1)", # Maps 1-7 (Mon-Sun) down to 0-6 to match UI map
-    "Hour": "EXTRACT(HOUR FROM f.Datetime)"
+# PostgreSQL-compliant time extraction
+PG_TIMEFRAME = {
+    "Day": '(EXTRACT(ISODOW FROM f."Datetime") - 1)', # Maps 1-7 (Mon-Sun) down to 0-6 to match UI map
+    "Hour": 'EXTRACT(HOUR FROM f."Datetime")'
 }
 
 def get_npets_schema(conn, tool_name: str) -> list:
     """
-    Interrogates the MySQL Information Schema to dynamically return 
-    measurement columns for a specific tool.
+    Interrogates the PostgreSQL Information Schema to dynamically return 
+    measurement columns using strict binding.
     """
     if tool_name not in VALID_TOOLS:
         raise ValueError(f"Security Alert: Invalid tool '{tool_name}'")
         
     target_table = VALID_TOOLS[tool_name]
     
-    # We query npets_tables and strictly exclude mechanical keys
-    query = f"""
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = '{target_table}' 
-          AND column_name NOT IN ('experiment_id', 'Datetime', 'Time', 'Date');
-    """
-    df = conn.execute(query).df()    
-    return df['column_name'].tolist()
+    # We pass the table name as a safe bound parameter
+    df = fetch_query(conn, NPETS_SCHEMA_QUERY, params={"target_table": target_table})    
+    if df is not None and not df.empty:
+        return df['column_name'].tolist()
+    return []
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_aggregated_npets_data(
     _conn,
-    agg_type,
+    agg_type: str,
     tool_name: str, 
     places: list, 
     seasons: list, 
@@ -47,46 +48,51 @@ def fetch_aggregated_npets_data(
     timeframe: str
 ) -> pd.DataFrame:
     """
-    Executes the analytical JOIN query utilizing bound parameters for security.
+    Executes the analytical JOIN query utilizing dictionary parameters and PG syntax.
     """
-    # 1. State Validation
     if tool_name not in VALID_TOOLS:
         raise ValueError("Security Alert: Invalid tool identifier")
-    if timeframe not in DUCKDB_TIMEFRAME:
+    if timeframe not in PG_TIMEFRAME:
         raise ValueError("Security Alert: Invalid timeframe identifier")
         
     target_table = VALID_TOOLS[tool_name]
-    time_expr = DUCKDB_TIMEFRAME[timeframe]
-    aggregations={"Mean":'AVG','Median':'Median'}
-    method=aggregations[agg_type]
-    # 2. Dynamic Math Application (Hardcoded to Mean/AVG for now)
-    agg_columns = ", ".join([f'{method}(f."{m}") AS "{m}"' for m in measurements])
+    time_expr = PG_TIMEFRAME[timeframe]
     
-    # 3. Dynamic Parameter Binding Arrays
-    places_in = format_in_clause(places)
-    seasons_in = format_in_clause(seasons)
+    if agg_type == 'Mean':
+        agg_columns = ", ".join([f'AVG(f."{m}") AS "{m}"' for m in measurements])
+    elif agg_type == 'Median':
+        agg_columns = ", ".join([f'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY f."{m}") AS "{m}"' for m in measurements])
+    else:
+        raise ValueError("Security Alert: Invalid aggregation method")
     
-
+    params = {}
     
-    # 4. Construct and Execute the Star Schema Query
-    query = f"""
-        SELECT 
-             d.location,
-             d.season,
-            {time_expr} AS time_bucket,
-            {agg_columns}
-        FROM npets_tables.{target_table} f
-        JOIN npets_tables.dim_experiment d ON f.experiment_id = d.experiment_id
-        WHERE d.location IN {places_in}
-          AND d.season IN {seasons_in.upper()}
-        GROUP BY ALL
-        ORDER BY time_bucket ASC;
-    """    
-    df =_conn.execute(query).df()
-    return df
+    # Bind Places dynamically
+    ph_places = []
+    for i, place in enumerate(places):
+        key = f"place_{i}"
+        ph_places.append(f":{key}")
+        params[key] = place
+        
+    # Bind Seasons dynamically
+    ph_seasons = []
+    for i, season in enumerate(seasons):
+        key = f"season_{i}"
+        ph_seasons.append(f":{key}")
+        params[key] = season.upper()
+    
+    query = NPETS_AGGREGATED_DATA_QUERY.format(
+        target_table=target_table,
+        time_expr=time_expr,
+        agg_columns=agg_columns,
+        places_ph=", ".join(ph_places),
+        seasons_ph=", ".join(ph_seasons)
+    )    
+    
+    return fetch_query(_conn, query, params=params)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_temporal_metadata(
     _conn, 
     tool_name: str, 
@@ -94,34 +100,38 @@ def fetch_temporal_metadata(
     seasons: list
 ) -> dict:
     """
-    Executes a high-speed DISTINCT scan to determine the exact temporal footprint 
-    (Years and Months) of the sliced data before mathematical aggregation occurs.
+    Executes a high-speed DISTINCT scan using strict dictionary binding.
     """
     if tool_name not in VALID_TOOLS:
         raise ValueError("Security Alert: Invalid tool identifier")
         
     target_table = VALID_TOOLS[tool_name]
+    params = {}
     
-    places_in = format_in_clause(places)
-    seasons_in = format_in_clause(seasons)
+    ph_places = []
+    for i, place in enumerate(places):
+        key = f"place_{i}"
+        ph_places.append(f":{key}")
+        params[key] = place
+        
+    ph_seasons = []
+    for i, season in enumerate(seasons):
+        key = f"season_{i}"
+        ph_seasons.append(f":{key}")
+        params[key] = season.upper()
     
+    query = NPETS_TEMPORAL_METADATA_QUERY.format(
+        target_table=target_table,
+        places_ph=", ".join(ph_places),
+        seasons_ph=", ".join(ph_seasons)
+    )
     
-    # We query only for the distinct chronological components
-    query = f"""
-        SELECT DISTINCT 
-            EXTRACT(YEAR FROM f.Datetime) AS data_year,
-            EXTRACT(MONTH FROM f.Datetime) AS data_month
-        FROM npets_tables.{target_table} f
-        JOIN npets_tables.dim_experiment d ON f.experiment_id = d.experiment_id
-        WHERE d.location IN {places_in}
-          AND d.season IN {seasons_in.upper()}
-        ORDER BY data_year ASC, data_month ASC;
-    """
-    df = _conn.execute(query).df()
-    df.dropna(subset=['data_year', 'data_month'], how='all', inplace=True)
+    df = fetch_query(_conn, query, params=params)
     
-    if df.empty:
+    if df is None or df.empty:
         return {"years": [], "months": []}
+        
+    df.dropna(subset=['data_year', 'data_month'], how='all', inplace=True)
     
     return {
         "years": df['data_year'].astype(int).unique().tolist(),

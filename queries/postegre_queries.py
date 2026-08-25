@@ -10,7 +10,7 @@ SELECT DISTINCT "Region" FROM prefecture_fuel_con;
 """
 
 GET_FUEL_PREFECTURES_BY_REGIONS_QUERY = """
-SELECT DISTINCT "Prefecture" FROM prefecture_fuel_con WHERE "Region" IN {regions};
+SELECT DISTINCT "Prefecture" FROM prefecture_fuel_con WHERE "Region" IN ({region_placeholders});
 """
 
 GET_ALL_FUEL_PREFECTURES_QUERY = """
@@ -24,7 +24,7 @@ SELECT min("Year"), max("Year") FROM prefecture_fuel_con;
 GET_FUEL_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = current_database()
+WHERE table_schema = 'public'
   AND table_name = 'prefecture_fuel_con'
   AND column_name NOT IN (
     'Year','Prefecture','Region',
@@ -35,8 +35,8 @@ WHERE table_schema = current_database()
 GET_FUEL_DATA = """
 SELECT {columns}
 FROM {table}
-WHERE {geography} IN {prefectures}
-  AND Year between {start_year} and {end_year};
+WHERE "{geography}" IN ({geo_placeholders})
+  AND "Year" BETWEEN :start_year AND :end_year;
 """
 
 # == Pollution Queries ==
@@ -125,7 +125,8 @@ WHERE "code name" REGEXP '^[{code_names}]' AND CHAR_LENGTH("code name") > 1;
 
 # == Years ==
 GET_DISTINCT_YEARS_QUERY = """
-SELECT DISTINCT "Year" FROM gas_econ_activity;
+SELECT DISTINCT "year" as "Year" FROM gas_econ_activity
+ORDER BY "Year" ASC;
 """
 
 
@@ -167,7 +168,7 @@ WHERE "Municipality" IN ({municipalities});
 # ECONOMIC ACTIVITY
 AIR_POL_QUERY = """
 SELECT column_name FROM information_schema.columns 
-WHERE table_schema = current_database()
+WHERE table_schema = 'public'
   AND table_name = 'gas_econ_activity' 
   AND column_name NOT IN ('code name','year','economic activity');
 """
@@ -175,58 +176,98 @@ WHERE table_schema = current_database()
 MAIN_ECON_ACTIVITY = """
 SELECT DISTINCT "economic activity", "code name" 
 FROM gas_econ_activity 
-WHERE CHAR_LENGTH("code name") < 2;
+WHERE LENGTH(TRIM("code name")) < 2;
 """
 
 SUB_ECON_QUERY = """
 SELECT DISTINCT "economic activity" 
 FROM gas_econ_activity
-WHERE TRIM("code name") LIKE CONCAT('{code_name_regex}', '%') 
+WHERE TRIM("code name") LIKE :code_name || '%' 
   AND LENGTH(TRIM("code name")) > 1;
 """
 
 ECON_ACTIVITY_QUERY = """
 SELECT "year", "economic activity", "{air_pollutant}" 
 FROM gas_econ_activity 
-WHERE "economic activity" IN {econ_act_query} 
-  AND "year" BETWEEN {start} AND {end};
+WHERE "economic activity" IN ({act_placeholders}) 
+  AND "year" BETWEEN :start_year AND :end_year;
 """
 
 # =====LIMANI Queries=======
 PORT_AGGREGATION_QUERY = """
 SELECT 
-    {timeframe} AS time_bucket,
-    {metric_aggs}
-FROM 
-    thess_port_assesment.{target_table}
-WHERE 
-    EXTRACT(YEAR FROM Datetime) BETWEEN {year_range[0]} AND {year_range[1]}
-    AND EXTRACT(MONTH FROM Datetime) BETWEEN {month_range[0]} AND {month_range[1]}
-    AND EXTRACT(ISODOW FROM Datetime BETWEEN {day_range[0]} AND {day_range[1]}
-GROUP BY time_bucket
-ORDER BY time_bucket ASC;
+    {time_expr} AS time_bucket,
+    {agg_columns}
+FROM public.{target_table}
+WHERE EXTRACT(YEAR FROM "{time_col}") BETWEEN :start_year AND :end_year
+  AND EXTRACT(MONTH FROM "{time_col}") BETWEEN :start_month AND :end_month
+  AND EXTRACT(ISODOW FROM "{time_col}") BETWEEN :start_day AND :end_day
+GROUP BY 1
+ORDER BY 1 ASC;
 """
     
 PORT_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = 'thess_port_assesment'
+WHERE table_schema = 'public'
   AND table_name = '{table_name}'
   AND column_name NOT IN ('Datetime','Date');
 """
-    
+
+
+PORT_METRICS_COLUMN_QUERY = """
+SELECT column_name 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name = :target_table 
+  AND data_type IN ('double precision', 'real', 'integer', 'numeric', 'bigint')
+  AND column_name != :time_col;
+"""
+
 PORT_TIME_COLUMN_QUERY = """
-SELECT column_name, data_type
-FROM information_schema.columns
-WHERE table_schema = 'thess_port_assesment'
-  AND table_name = '{table_name}'
-  AND data_type IN ('DATE', 'TIMESTAMP', 'DATETIME')
-LIMIT 1;
+SELECT column_name 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name = :target_table 
+  AND data_type IN ('timestamp without time zone', 'timestamp with time zone', 'date');
 """
     
-PORT_GET_TIME_BOUNDARIES_QUERY = """
+PORT_TIME_BOUNDARIES_QUERY = """
 SELECT 
-    MIN("{time_col}") AS min_time,
-    MAX("{time_col}") AS max_time
-FROM thess_port_assesment.{table_name};
+    MIN(EXTRACT(YEAR FROM "{time_col}")) AS min_y, 
+    MAX(EXTRACT(YEAR FROM "{time_col}")) AS max_y 
+FROM public.{target_table};
+"""
+
+NPETS_SCHEMA_QUERY = """
+SELECT column_name 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name = :target_table 
+  AND column_name NOT IN ('experiment_id', 'Datetime', 'Time', 'Date');
+"""
+
+NPETS_AGGREGATED_DATA_QUERY = """
+SELECT 
+    d.location,
+    d.season,
+    {time_expr} AS time_bucket,
+    {agg_columns}
+FROM public.{target_table} f
+JOIN public.dim_experiment d ON f.experiment_id = d.experiment_id
+WHERE d.location IN ({places_ph})
+  AND d.season IN ({seasons_ph})
+GROUP BY 1, 2, 3
+ORDER BY 3 ASC;
+"""
+
+NPETS_TEMPORAL_METADATA_QUERY = """
+SELECT DISTINCT 
+    EXTRACT(YEAR FROM f."Datetime") AS data_year,
+    EXTRACT(MONTH FROM f."Datetime") AS data_month
+FROM public.{target_table} f
+JOIN public.dim_experiment d ON f.experiment_id = d.experiment_id
+WHERE d.location IN ({places_ph})
+  AND d.season IN ({seasons_ph})
+ORDER BY data_year ASC, data_month ASC;
 """

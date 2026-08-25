@@ -1,63 +1,50 @@
 import pandas as pd
 import streamlit as st
+from utils.db_conn import fetch_query
 from utils.constants import VALID_TABLES
+from queries.postegre_queries import (
+    PORT_TIME_COLUMN_QUERY,
+    PORT_METRICS_COLUMN_QUERY,
+    PORT_TIME_BOUNDARIES_QUERY,
+    PORT_AGGREGATION_QUERY
+)
 # ==============================================================================
 # CONFIGURATION & WHITELISTS (Decoupling logic from the UI)
 # ==============================================================================
-DUCKDB_TIMEFRAME = {
-    "Year": "EXTRACT(YEAR FROM {time_col})",
-    "Month": "EXTRACT(MONTH FROM {time_col})",
-    "Day": "EXTRACT(ISODOW FROM {time_col})",
-    "Hour": "EXTRACT(HOUR FROM {time_col})"
+PG_TIMEFRAME = {
+    "Year": 'EXTRACT(YEAR FROM "{time_col}")',
+    "Month": 'EXTRACT(MONTH FROM "{time_col}")',
+    "Day": 'EXTRACT(ISODOW FROM "{time_col}")',
+    "Hour": 'EXTRACT(HOUR FROM "{time_col}")'
 }
 
-@st.cache_data(ttl=86400, max_entries=5)
+
+
+@st.cache_data(ttl=86400, max_entries=5, show_spinner=False)
 def get_port_metadata(_conn, table_alias: str) -> dict:
-    """
-    Dynamically fetches the time column, valid metrics, and chronological 
-    boundaries for the target port table.
-    """
+    """Dynamically fetches safe table metrics using strict parameterization."""
     if table_alias not in VALID_TABLES:
         raise ValueError(f"Security Alert: Invalid table identifier '{table_alias}'")
         
     target_table = VALID_TABLES[table_alias]
     
-    # 1. Identify the Time Column
-    query_time = f"""
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = '{target_table}' 
-          AND data_type IN ('TIMESTAMP', 'DATETIME', 'DATE', 'TIMESTAMP WITH TIME ZONE');
-    """
-    time_col_df = _conn.execute(query_time).df()
-    
-    if time_col_df.empty:
+    # 1. Identify Time Column
+    time_col_df = fetch_query(_conn, PORT_TIME_COLUMN_QUERY, params={"target_table": target_table})
+    if time_col_df is None or time_col_df.empty:
         return {"time_col": None, "metrics": [], "min_year": None, "max_year": None}
         
     time_col = time_col_df['column_name'].iloc[0]
     
-    # 2. Identify the Valid Measurement Metrics (Exclude IDs and Time columns)
-    query_metrics = f"""
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = '{target_table}' 
-          AND data_type IN ('DOUBLE', 'FLOAT', 'INTEGER', 'NUMERIC', 'BIGINT')
-          AND column_name != '{time_col}';
-    """
+    # 2. Identify Metrics
+    metrics_df = fetch_query(_conn, PORT_METRICS_COLUMN_QUERY, params={"target_table": target_table, "time_col": time_col})
+    metrics = metrics_df['column_name'].tolist() if metrics_df is not None else []
     
-    metrics_df = _conn.execute(query_metrics).df()
-    metrics = metrics_df['column_name'].tolist()
+    # 3. Establish Historical Bounds
+    query_bounds = PORT_TIME_BOUNDARIES_QUERY.format(time_col=time_col, target_table=target_table)
+    bounds_df = fetch_query(_conn, query_bounds)
     
-    # 3. Establish Historical Bounds for Sliders
-    query_bounds = f"""
-        SELECT 
-            MIN(EXTRACT(YEAR FROM "{time_col}")) AS min_y, 
-            MAX(EXTRACT(YEAR FROM "{time_col}")) AS max_y 
-        FROM thess_port_assesment.{target_table}
-    """
-    bounds_df = _conn.execute(query_bounds).df()
-    min_y = int(bounds_df['min_y'].iloc[0]) if not pd.isna(bounds_df['min_y'].iloc[0]) else 2000
-    max_y = int(bounds_df['max_y'].iloc[0]) if not pd.isna(bounds_df['max_y'].iloc[0]) else 2024
+    min_y = int(bounds_df['min_y'].iloc[0]) if bounds_df is not None and not pd.isna(bounds_df['min_y'].iloc[0]) else 2000
+    max_y = int(bounds_df['max_y'].iloc[0]) if bounds_df is not None and not pd.isna(bounds_df['max_y'].iloc[0]) else 2024
     
     return {
         "time_col": time_col, 
@@ -66,7 +53,7 @@ def get_port_metadata(_conn, table_alias: str) -> dict:
         "max_year": max_y
     }
 
-@st.cache_data(ttl=3600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10, show_spinner=False)
 def fetch_aggregated_port_data(
     _conn,
     agg_type: str,
@@ -77,14 +64,10 @@ def fetch_aggregated_port_data(
     month_range: tuple,
     day_range: tuple
 ) -> pd.DataFrame:
-    """
-    Executes the analytical query utilizing strict whitelisting for structural 
-    components and TRUE parameter binding (?) for user values.
-    """
-    # 1. Structural Whitelisting (Cannot be parameterized by the DB)
+    """Executes the analytical query using dictionary parameter mapping."""
     if table_alias not in VALID_TABLES:
         raise ValueError("Security Alert: Invalid table identifier")
-    if timeframe not in DUCKDB_TIMEFRAME:
+    if timeframe not in PG_TIMEFRAME:
         raise ValueError("Security Alert: Invalid timeframe identifier")
         
     target_table = VALID_TABLES[table_alias]
@@ -94,31 +77,30 @@ def fetch_aggregated_port_data(
     if not time_col:
          raise ValueError(f"No temporal column found in {target_table}")
 
-    time_expr = DUCKDB_TIMEFRAME[timeframe].format(time_col=f'"{time_col}"')
-    sql_agg_func = 'AVG' if agg_type == 'Mean' else 'MEDIAN'
+    # Inject the actual column name into the extraction template
+    time_expr = PG_TIMEFRAME[timeframe].format(time_col=time_col)
     
-    # Safely building the SELECT clause using our verified measurement list
-    agg_columns = ", ".join([f'{sql_agg_func}("{m}") AS "{m}"' for m in measurements])
+    # Map the correct PostgreSQL aggregation function
+    if agg_type == 'Mean':
+        agg_columns = ", ".join([f'AVG("{m}") AS "{m}"' for m in measurements])
+    elif agg_type == 'Median':
+        agg_columns = ", ".join([f'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "{m}") AS "{m}"' for m in measurements])
+    else:
+        raise ValueError("Security Alert: Invalid aggregation method")
     
-    # 2. True Parameter Binding (The Fix)
-    # Notice the '?' placeholders. The database treats these STRICTLY as literal values.
-    query = f"""
-        SELECT 
-            {time_expr} AS time_bucket,
-            {agg_columns}
-        FROM thess_port_assesment.{target_table}
-        WHERE EXTRACT(YEAR FROM "{time_col}") BETWEEN ? AND ?
-          AND EXTRACT(MONTH FROM "{time_col}") BETWEEN ? AND ?
-          AND EXTRACT(ISODOW FROM "{time_col}") BETWEEN ? AND ?
-        GROUP BY time_bucket
-        ORDER BY time_bucket ASC;
-    """    
+    # Inject structural elements
+    query = PORT_AGGREGATION_QUERY.format(
+        time_expr=time_expr,
+        agg_columns=agg_columns,
+        target_table=target_table,
+        time_col=time_col
+    )    
     
-    # We pass the tuple of parameters directly to the execute function
-    params = (
-        year_range[0], year_range[1],
-        month_range[0], month_range[1],
-        day_range[0], day_range[1]
-    )
+    # Strictly map dictionary parameters
+    params = {
+        "start_year": year_range[0], "end_year": year_range[1],
+        "start_month": month_range[0], "end_month": month_range[1],
+        "start_day": day_range[0], "end_day": day_range[1]
+    }
     
-    return _conn.execute(query, params).df()
+    return fetch_query(_conn, query, params=params)

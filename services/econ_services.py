@@ -28,12 +28,13 @@ def get_cached_main_activities(_conn) -> pd.DataFrame:
     
 def get_cached_sub_activities(_conn, code_name: str) -> list:
     """
-    Safely retrieves sub-economic activities using true parameter binding.
+    Safely retrieves sub-economic activities using strict dictionary parameterization.
     """
     if not code_name:
         return []
     
-    df = fetch_query(_conn,SUB_ECON_QUERY, params=(code_name,))
+    # We bind the parameter natively. The SQL query handles appending the '%' wildcard.
+    df = fetch_query(_conn, SUB_ECON_QUERY, params={"code_name": code_name})
     if df is not None and not df.empty:
         return df['economic activity'].tolist()
     return []
@@ -48,23 +49,34 @@ def fetch_aggregated_econ_data(
 ) -> pd.DataFrame:
     """
     Executes the analytical query using strict structural validation 
-    for the column name and parameterization for the WHERE clauses.
+    for the column name and absolute dictionary parameterization for the WHERE clauses.
     """
-    # 1. Structural Whitelisting
+    # 1. Structural Whitelisting (Guarantees column safety)
     if pollutant not in valid_pollutants:
         raise ValueError("Security Alert: Invalid pollutant identifier")
-    
     
     if not activities:
         return pd.DataFrame()
 
-    # 2. Parameter Binding Preparation
-    placeholders = ", ".join(["?"] * len(activities))
+    # 2. Dynamic Dictionary Parameter Binding
+    params = {
+        "start_year": start_year,
+        "end_year": end_year
+    }
     
-    # Safely injecting the validated column name directly
+    ph_list = []
+    for i, act in enumerate(activities):
+        key = f"act_{i}"
+        ph_list.append(f":{key}")  # Creates the structural placeholder (e.g., :act_0)
+        params[key] = act          # Binds the actual data
+        
+    placeholders = ", ".join(ph_list)
+    
+    # 3. Safely injecting the validated column and placeholders into the SQL shape
     query = ECON_ACTIVITY_QUERY.format(
         air_pollutant=pollutant, 
-        placeholders=placeholders
+        act_placeholders=placeholders
     )
-    params = tuple(activities) + (start_year, end_year)
+    
+    # Execute using the secure dictionary
     return fetch_query(_conn, query, params=params)
