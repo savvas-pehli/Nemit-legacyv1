@@ -31,6 +31,9 @@ artifacts/
 init_db.py
 Requesting script.py
 testing.py
+Dockerfile
+docker-compose.yaml
+new_requires.txt
 # 5. IDE and OS Files
 .DS_Store      # macOS
 thumbs.db      # Windows

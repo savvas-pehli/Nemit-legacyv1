@@ -38,3 +38,6 @@ Geospatial data inherently degrades during cross-database migrations. This platf
 *   **Frontend:** Streamlit, Plotly (WebGL)
 *   **Data Processing:** Polars, Pandas, Shapely, GeoPandas
 *   **Database:** PostgreSQL, SQLAlchemy
+
+
+

@@ -5,7 +5,8 @@ from queries.postegre_queries import (
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,
     GET_ALL_STATIONS_QUERY,
-    GET_AGGREGATTED_DATA
+    GET_AGGREGATED_DATA,
+    GET_AGGREGATED_DATA_MV
 )
 
 def get_stations_by_regions(_conn, regions: list) -> list:
@@ -62,18 +63,50 @@ def fetch_aggregated_pollution_data(
         if gas not in valid_gases:
             raise ValueError(f"Security Alert: Invalid gas identifier '{gas}'")
 
-    sql_timeframe = {
-        "Year": 'EXTRACT(YEAR FROM "record_datetime")',
-        "Month": 'EXTRACT(MONTH FROM "record_datetime")',
-        "Day": 'EXTRACT(ISODOW FROM "record_datetime")',
-        "Hour": 'EXTRACT(HOUR FROM "record_datetime")'
-    }
-    sql_agg = {"Mean": 'AVG("{gas}")', "Median": 'percentile_cont(0.5) WITHIN GROUP (ORDER BY "{gas}")'}
-    
-    timeframe_expr = sql_timeframe.get(timeframe)
-    gas_aggs = ', '.join([f'{sql_agg[agg_method].format(gas=gas)} AS "{gas}"' for gas in gases])
-    
-    # Base parameters mapping exactly to the SQL template
+    # ==============================================================================
+    # DYNAMIC QUERY ROUTER
+    # ==============================================================================
+    use_mv = (agg_method == "Mean" and timeframe in ["Year", "Month", "Day"])
+
+    if use_mv:
+        sql_timeframe = {
+            "Year": '"Year"',
+            "Month": '"Month"',
+            "Day": '"day_of_week"'
+        }
+        mv_gas_map = {
+            "CO mg/m^3": ("sum_co", "count_co"),
+            "SO2 mug/m^3": ("sum_so2", "count_so2"),
+            "NO2 mug/m^3": ("sum_no2", "count_no2"),
+            "O3 mug/m^3": ("sum_o3", "count_o3"),
+            "PM10 mug/m^3": ("sum_pm10", "count_pm10"),
+            "PM2.5 mug/m^3": ("sum_pm25", "count_pm25"),
+            "Benzene mug/m^3": ("sum_benzene", "count_benzene")
+        }
+        timeframe_expr = sql_timeframe.get(timeframe)
+        gas_aggs = ', '.join([
+            f'SUM({mv_gas_map[gas][0]}) / NULLIF(SUM({mv_gas_map[gas][1]}), 0) AS "{gas}"' 
+            for gas in gases
+        ])
+        query_template = GET_AGGREGATED_DATA_MV
+    else:
+        sql_timeframe = {
+            "Year": 'EXTRACT(YEAR FROM "record_datetime")',
+            "Month": 'EXTRACT(MONTH FROM "record_datetime")',
+            "Day": 'EXTRACT(ISODOW FROM "record_datetime")',
+            "Hour": 'EXTRACT(HOUR FROM "record_datetime")'
+        }
+        sql_agg = {
+            "Mean": 'AVG("{gas}")', 
+            "Median": 'percentile_cont(0.5) WITHIN GROUP (ORDER BY "{gas}")'
+        }
+        timeframe_expr = sql_timeframe.get(timeframe)
+        gas_aggs = ', '.join([f'{sql_agg[agg_method].format(gas=gas)} AS "{gas}"' for gas in gases])
+        query_template = GET_AGGREGATED_DATA
+
+    # ==============================================================================
+    # EXACT PARAMETER BINDING (Unchanged)
+    # ==============================================================================
     params = {
         "month_start": month_range[0],
         "month_end": month_range[1],
@@ -81,7 +114,6 @@ def fetch_aggregated_pollution_data(
         "day_end": day_range[1]
     }
     
-    # Strict Station Mapping
     upper_stations = [s.upper() for s in stations]
     stat_placeholders = []
     for i, stat in enumerate(upper_stations):
@@ -89,9 +121,7 @@ def fetch_aggregated_pollution_data(
         stat_placeholders.append(f":{key}")
         params[key] = stat
         
-    # Strict Year Mapping
     if isinstance(year_range, tuple):
-        # Enforce exact case matching with PostgreSQL schema ("Year")
         year_condition_expr = '"Year" BETWEEN :year_start AND :year_end'
         params["year_start"] = year_range[0]
         params["year_end"] = year_range[1]
@@ -101,13 +131,13 @@ def fetch_aggregated_pollution_data(
             key = f"yr_{i}"
             year_placeholders.append(f":{key}")
             params[key] = yr
-        # Enforce exact case matching with PostgreSQL schema ("Year")
         year_condition_expr = f'"Year" IN ({", ".join(year_placeholders)})'
         
-    query = GET_AGGREGATTED_DATA.format(
+    query = query_template.format(
         timeframe=timeframe_expr,
         gas_aggs=gas_aggs,
         station_placeholders=", ".join(stat_placeholders),
         year_condition=year_condition_expr
     )
+    
     return fetch_query(_conn, query, params=params)

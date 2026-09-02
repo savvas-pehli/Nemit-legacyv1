@@ -56,7 +56,7 @@ GET_ALL_STATIONS_QUERY = """
 SELECT "station" FROM new_stations_regions;
 """
 
-GET_AGGREGATTED_DATA = """
+GET_AGGREGATED_DATA = """
 SELECT 
     "Station",
     {timeframe} AS "record_datetime",
@@ -64,6 +64,20 @@ SELECT
 FROM "clean" 
 WHERE "Station" IN ({station_placeholders})
   AND "Year" BETWEEN :year_start AND :year_end
+  AND "Month" BETWEEN :month_start AND :month_end
+  AND "day_of_week" BETWEEN :day_start AND :day_end
+GROUP BY 1, 2
+ORDER BY 2 ASC;
+"""
+
+GET_AGGREGATED_DATA_MV = """
+SELECT 
+    "Station",
+    {timeframe} AS "record_datetime",
+    {gas_aggs}
+FROM public.mv_station_base_grain
+WHERE "Station" IN ({station_placeholders})
+  AND {year_condition}
   AND "Month" BETWEEN :month_start AND :month_end
   AND "day_of_week" BETWEEN :day_start AND :day_end
 GROUP BY 1, 2
