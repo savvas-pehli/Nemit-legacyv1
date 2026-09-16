@@ -54,8 +54,8 @@ FROM information_schema.columns
 WHERE table_schema = 'main'
   AND table_name = 'clean'
   AND column_name NOT IN (
-    'year','municipality','Hour','Date','station','region',
-    'Month','Day','day_of_week','record_datetime','id'
+    'year','municipality','Hour','Date','Station','Region',
+    'Month','Day','day_of_week','record_datetime','id','Year'
   );
 """
 GET_CHORO_GAS_COLUMNS_QUERY = """
