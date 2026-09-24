@@ -9,7 +9,7 @@ import pandas as pd
 def get_cached_regions(_conn):
     df = fetch_query(_conn, GET_REGIONS_QUERY)
     if df is not None and not df.empty:
-        return sorted(df['region'].tolist())
+        return sorted(df['Region'].tolist())
     return []
 
 @st.cache_data(ttl=86400)

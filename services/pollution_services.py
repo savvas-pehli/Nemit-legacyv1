@@ -1,13 +1,12 @@
 import pandas as pd
 from sqlalchemy import text
 from utils.db_conn import fetch_query
+import streamlit as st
 from queries.postegre_queries import (
     GET_STATIONS_BY_REGIONS_QUERY,
     GET_COMMON_YEARS_FOR_STATIONS,
     GET_ALL_STATIONS_QUERY,
-    GET_AGGREGATED_DATA,
-    GET_AGGREGATED_DATA_MV
-)
+    GET_AGGREGATED_DATA)
 
 def get_stations_by_regions(_conn, regions: list) -> list:
     if not regions:
@@ -26,7 +25,7 @@ def get_stations_by_regions(_conn, regions: list) -> list:
         
     if df is not None and not df.empty:
         # RETURN RAW STRINGS. DO NOT MUTATE.
-        return df['station'].tolist() 
+        return df['Station'].tolist() 
     return []
 
 
@@ -34,11 +33,11 @@ def get_common_years(_conn, stations: list) -> list:
     if not stations:
         return []
     
-    upper_stations = [s.upper() for s in stations]
-    params = {"station_count": len(upper_stations)}
+    
+    params = {"station_count": len(stations)}
     station_placeholders = []
     
-    for i, station in enumerate(upper_stations):
+    for i, station in enumerate(stations):
         key = f"stat_{i}"
         station_placeholders.append(f":{key}")
         params[key] = station
@@ -64,48 +63,34 @@ def fetch_aggregated_pollution_data(
             raise ValueError(f"Security Alert: Invalid gas identifier '{gas}'")
 
     # ==============================================================================
-    # DYNAMIC QUERY ROUTER
+    # DYNAMIC SQL GENERATOR (Targeting clean_v2)
     # ==============================================================================
-    use_mv = (agg_method == "Mean" and timeframe in ["Year", "Month", "Day"])
+    
+    # 1. Map Streamlit Timeframes to PostgreSQL DATE_TRUNC
+    sql_timeframe = {
+        "Year": 'EXTRACT(YEAR FROM "record_datetime")',
+        "Month": 'EXTRACT(MONTH FROM "record_datetime")',
+        # ISODOW returns 1=Monday to 7=Sunday, perfectly matching your DAYS_MAP
+        "Day": 'EXTRACT(ISODOW FROM "record_datetime")', 
+        "Hour": 'EXTRACT(HOUR FROM "record_datetime")'
+    }
+    timeframe_expr = sql_timeframe.get(timeframe, "record_datetime")
 
-    if use_mv:
-        sql_timeframe = {
-            "Year": '"Year"',
-            "Month": '"Month"',
-            "Day": '"day_of_week"'
-        }
-        mv_gas_map = {
-            "CO mg/m^3": ("sum_co", "count_co"),
-            "SO2 mug/m^3": ("sum_so2", "count_so2"),
-            "NO2 mug/m^3": ("sum_no2", "count_no2"),
-            "O3 mug/m^3": ("sum_o3", "count_o3"),
-            "PM10 mug/m^3": ("sum_pm10", "count_pm10"),
-            "PM2.5 mug/m^3": ("sum_pm25", "count_pm25"),
-            "Benzene mug/m^3": ("sum_benzene", "count_benzene")
-        }
-        timeframe_expr = sql_timeframe.get(timeframe)
-        gas_aggs = ', '.join([
-            f'SUM({mv_gas_map[gas][0]}) / NULLIF(SUM({mv_gas_map[gas][1]}), 0) AS "{gas}"' 
-            for gas in gases
-        ])
-        query_template = GET_AGGREGATED_DATA_MV
-    else:
-        sql_timeframe = {
-            "Year": 'EXTRACT(YEAR FROM "record_datetime")',
-            "Month": 'EXTRACT(MONTH FROM "record_datetime")',
-            "Day": 'EXTRACT(ISODOW FROM "record_datetime")',
-            "Hour": 'EXTRACT(HOUR FROM "record_datetime")'
-        }
-        sql_agg = {
-            "Mean": 'AVG("{gas}")', 
-            "Median": 'percentile_cont(0.5) WITHIN GROUP (ORDER BY "{gas}")'
-        }
-        timeframe_expr = sql_timeframe.get(timeframe)
-        gas_aggs = ', '.join([f'{sql_agg[agg_method].format(gas=gas)} AS "{gas}"' for gas in gases])
-        query_template = GET_AGGREGATED_DATA
+    # 2. Map Aggregation Method to PostgreSQL Syntax
+    agg_sqls = []
+    for gas in gases:
+        safe_gas = f'"{gas}"' # Double quotes for case-sensitivity
+        
+        if agg_method == "Mean":
+            agg_sqls.append(f'ROUND(AVG({safe_gas})::numeric, 2) AS {safe_gas}')
+        elif agg_method == "Median":
+            # Native PostgreSQL Median calculation
+            agg_sqls.append(f'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_gas}) AS {safe_gas}')
+            
+    gas_aggs = ",\n    ".join(agg_sqls)
 
     # ==============================================================================
-    # EXACT PARAMETER BINDING (Unchanged)
+    # EXACT PARAMETER BINDING 
     # ==============================================================================
     params = {
         "month_start": month_range[0],
@@ -114,9 +99,8 @@ def fetch_aggregated_pollution_data(
         "day_end": day_range[1]
     }
     
-    upper_stations = [s.upper() for s in stations]
     stat_placeholders = []
-    for i, stat in enumerate(upper_stations):
+    for i, stat in enumerate(stations):
         key = f"stat_{i}"
         stat_placeholders.append(f":{key}")
         params[key] = stat
@@ -133,11 +117,10 @@ def fetch_aggregated_pollution_data(
             params[key] = yr
         year_condition_expr = f'"Year" IN ({", ".join(year_placeholders)})'
         
-    query = query_template.format(
+    query = GET_AGGREGATED_DATA.format(
         timeframe=timeframe_expr,
         gas_aggs=gas_aggs,
         station_placeholders=", ".join(stat_placeholders),
         year_condition=year_condition_expr
     )
-    
     return fetch_query(_conn, query, params=params)

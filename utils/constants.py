@@ -5,10 +5,10 @@ MONTHS_LIST = [
     "January", "February", "March", "April", "May", "June", 
     "July", "August", "September", "October", "November", "December"
 ]
-MONTH_MAP = {month: index + 1 for index, month in enumerate(MONTHS_LIST)}
+MONTH_MAP = {month: index+1 for index, month in enumerate(MONTHS_LIST)}
 
 DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-DAYS_MAP = {day: index + 1 for index, day in enumerate(DAYS_LIST)}
+DAYS_MAP = {day: index+1  for index, day in enumerate(DAYS_LIST)}
 
 # Specific 0-indexed map for PostgreSQL ISODOW minus 1 calculations (nPETS)
 ISODOW_MAP_0_INDEXED = {

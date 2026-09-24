@@ -2,7 +2,7 @@
 
 # ==Fuel consumption Queries==
 GET_STATIONS_BY_REGIONS_QUERY = """
-SELECT "station" FROM new_stations_regions WHERE "region" IN ({region_placeholders});
+SELECT "Station" FROM public.mv_regions_station_v2 WHERE "Region" IN ({region_placeholders});
 """
 
 GET_FUEL_REGIONS_QUERY = """
@@ -41,19 +41,19 @@ WHERE "{geography}" IN ({geo_placeholders})
 
 # == Pollution Queries ==
 GET_REGIONS_QUERY = """
-SELECT DISTINCT "region" FROM new_stations_regions; 
+SELECT DISTINCT "Region" FROM public.mv_regions_station_v2; 
 """
 
 GET_COMMON_YEARS_FOR_STATIONS = """
 SELECT "Year"
-FROM newyearstations
-WHERE "station" IN ({station_placeholders})
+FROM public.mv_station_years_v2
+WHERE "Station" IN ({station_placeholders})
 GROUP BY "Year"
-HAVING COUNT(DISTINCT "station") = :station_count;
+HAVING COUNT(DISTINCT "Station") = :station_count;
 """
 
 GET_ALL_STATIONS_QUERY = """
-SELECT "station" FROM new_stations_regions;
+SELECT DISTINCT("Station") FROM public.mv_regions_station_v2;
 """
 
 GET_AGGREGATED_DATA = """
@@ -61,7 +61,7 @@ SELECT
     "Station",
     {timeframe} AS "record_datetime",
     {gas_aggs}
-FROM "clean" 
+FROM "clean_v2" 
 WHERE "Station" IN ({station_placeholders})
   AND "Year" BETWEEN :year_start AND :year_end
   AND "Month" BETWEEN :month_start AND :month_end
@@ -75,7 +75,7 @@ SELECT
     "Station",
     {timeframe} AS "record_datetime",
     {gas_aggs}
-FROM public.mv_station_base_grain
+FROM public.clean_v2
 WHERE "Station" IN ({station_placeholders})
   AND {year_condition}
   AND "Month" BETWEEN :month_start AND :month_end
@@ -86,7 +86,7 @@ ORDER BY 2 ASC;
 
 GET_AIR_POLLUTION_DATA = """
 SELECT {columns}
-FROM "clean" 
+FROM "clean_v2" 
 WHERE "Station" IN {stations}
   AND {year_condition}
   AND "Month" BETWEEN :month_start AND :month_end
@@ -98,10 +98,10 @@ GET_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
 WHERE table_schema = 'public'
-  AND table_name = 'clean'
+  AND table_name = 'clean_v2'
   AND column_name NOT IN (
-    'Year','municipality','Hour','Date','station','Region',
-    'Month','Day','day_of_week','record_datetime','id','Station'
+    'Year','municipality','Hour','Date','Region',
+    'Month','Day','day_of_week','record_datetime','id','Station','batch_id', 'ingested_at'
   );
 """
 
@@ -109,7 +109,7 @@ GET_CHORO_GAS_COLUMNS_QUERY = """
 SELECT column_name
 FROM information_schema.columns
 WHERE table_schema = 'public'
-  AND table_name = 'clean'
+  AND table_name = 'clean_v2'
   AND column_name NOT IN (
     'Year','municipality','Hour','Date','Station','region','CO mg/m^3','NO mug/m^3','Benz mug/m^3',
     'Month','Day','day_of_week','record_datetime','id'
@@ -153,7 +153,7 @@ ORDER BY "Year" ASC;
 
 CHECK_GAS_VALIDITY = """
 SELECT COUNT(*) AS count
-FROM clean
+FROM clean_v2
 WHERE Station IN {stations}
   AND {year_condition}
   AND Month BETWEEN {month_start} AND {month_end}

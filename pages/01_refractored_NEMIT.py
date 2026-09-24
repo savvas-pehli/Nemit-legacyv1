@@ -52,7 +52,7 @@ if common_years:
     else:
         year_range = st.sidebar.multiselect("Select Years", sorted_years)
 else:
-    year_range = st.sidebar.slider("Year Range", 2001, 2022, (2001, 2022))
+    year_range = st.sidebar.slider("Year Range", 2001, 2022, (2001, 2024))
 
 # Month and Day Configuration
 month_selection = st.sidebar.select_slider(

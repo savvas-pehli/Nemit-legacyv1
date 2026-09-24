@@ -3,6 +3,8 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import json
+from utils.constants import  DAYS_MAP, MONTH_MAP
+
 def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     co_max = gdf[column].max()
     pollutant_name, measurement_unit = column.split(" ", 1)
@@ -80,14 +82,7 @@ def choropleth_mapbox(gdf, geojson, column, region, ani_frame):
     st.plotly_chart(fig, theme='streamlit', width='stretch',config={'displayModeBar': False})
 
 def dynamic_groupby_bar_chart(df, gases, timeframe):
-    months = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-        ]
-    month_map = {month: int(index)+1  for index, month in enumerate(months)}
-    
-    days =['Monday','Tuesday','Wednesday','Thursday','Firday','Saturday','Sunday']
-    days_map={day: index+1 for index, day in enumerate(days)}
+
     fig = go.Figure()
     locations = [name.replace("_", " ") for name in df['Station'].unique()]
     number_of_locations=len(locations)
@@ -119,24 +114,29 @@ def dynamic_groupby_bar_chart(df, gases, timeframe):
     if not fig.data:
             st.warning("No data traces were added to the plot. Check selected gases, stations, and aggregated data.")
             return
-    global_dates = df['record_datetime'].sort_values().unique()
-    
-    # 2. FIX: Map the global dates to your ticktext formats safely.
-    group_timeframe = {
-        "Year": global_dates,
-        "Month": pd.Series(global_dates).map({v: k for k, v in month_map.items()}).values,
-        "Day": pd.Series(global_dates).map({v: k for k, v in days_map.items()}).values,
-        "Hour": [f"{int(x):02}:00:00" for x in range(0, 24)]
+    year_vals = sorted(df['record_datetime'].dropna().unique())
+
+    # 2. Map the timeframe string to its exact (tick_vals, tick_text) tuple
+    axis_config = {
+        "Month": (list(range(1, 13)), list(MONTH_MAP.keys())),
+        "Day":   (list(range(1, 8)), list(DAYS_MAP.keys())),
+        "Hour":  (list(range(24)), [f"{h:02}:00" for h in range(24)]),
+        "Year":  (year_vals, [str(int(y)) for y in year_vals])
     }
 
+    # 3. Fetch and unpack the configuration (defaults to 'Year' if not found)
+    tick_vals, tick_text = axis_config.get(timeframe, axis_config["Year"])
+    
     fig.update_layout(
         xaxis=dict(
+            title=timeframe,
             type='category', 
             categoryorder='array',           
-            categoryarray=global_dates,     
+            categoryarray=tick_vals,     
             tickmode='array',
-            tickvals=global_dates,
-            ticktext=tuple(group_timeframe[timeframe]) if timeframe != "Hour" else None
+            tickvals=tick_vals,
+            ticktext=tick_text,
+            tickangle=45  # Applies the 45-degree rotation
         )
     )
     layout_args = {

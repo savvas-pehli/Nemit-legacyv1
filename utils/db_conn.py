@@ -56,7 +56,6 @@ def fetch_query(conn, query: str, params: dict | None = None) -> pd.DataFrame | 
         if params is not None:
             # Wrap the string to enable named parameter binding (e.g., :param_name)
             query = text(query)
-            
         return pd.read_sql(query, con=conn, params=params)
     except Exception as e:
         st.error(f"Query Execution Error: {e}")
