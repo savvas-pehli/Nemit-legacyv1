@@ -36,39 +36,3 @@ def get_port_time_column_metadata(_conn, table_name):
     # Fallback if somehow a table has no date column
     return None, None
 
-@st.cache_data(ttl=86400)
-def get_port_table_columns(_conn, table_name):
-    """Fetches the available metrics for the selected analysis type."""
-    # We query the information schema to get the actual gas/particle column names
-    query =PORT_COLUMNS_QUERY.format(table_name=table_name)
-    df = fetch_query(_conn, query)
-    if df is not None and not df.empty:
-        return df['column_name'].tolist()
-    return []
-
-@st.cache_data(ttl=86400)
-def get_dynamic_year_bounds(_conn, table_name, time_col_name):
-    """
-    Extracts the minimum and maximum years from the target table.
-    Caches the boundaries to prevent redundant full-table scans.
-    """
-    query = PORT_GET_TIME_BOUNDARIES_QUERY.format(
-        time_col=time_col_name, 
-        table_name=table_name
-    )
-    
-    df = fetch_query(_conn, query)
-    
-    # Defensive check: Ensure dataframe is valid and not empty (e.g., table has no rows)
-    if df is not None and not df.empty and pd.notna(df['min_time'].iloc[0]):
-        # Convert strings to Pandas datetime objects
-        min_date = pd.to_datetime(df['min_time'].iloc[0])
-        max_date = pd.to_datetime(df['max_time'].iloc[0])
-        
-        return {
-            "min_year": int(min_date.year),
-            "max_year": int(max_date.year)
-        }
-        
-    # Fallback failsafe if the database returns an empty payload
-    return {"min_year": 2020, "max_year": 2026}

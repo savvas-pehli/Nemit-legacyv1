@@ -1,11 +1,14 @@
 # utils/db.py
 
+import os
 import streamlit as st
 #from typing import Any
 import pandas as pd
 import logging
 from sqlalchemy import create_engine, text
 logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file
 
 @st.cache_resource
 def get_database_engine():
@@ -14,11 +17,16 @@ def get_database_engine():
     This runs exactly once and is shared across all Streamlit sessions.
     """
     # 1. Fetch credentials securely from Streamlit secrets
-    db_config = st.secrets["connections"]["postgresql_docker"]
+    db_user = os.environ.get("POSTGRES_USER")
+    db_password = os.environ.get("POSTGRES_PASSWORD")
+    db_host = os.environ.get("POSTGRES_HOST")
+    db_port = os.environ.get("POSTGRES_PORT")
+    db_name = os.environ.get("POSTGRES_NAME")
     
-    # 2. Construct the connection string dynamically
-    db_url = f"{db_config['dialect']}+{db_config['driver']}://{db_config['username']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+    if not all([db_user, db_password, db_host, db_port, db_name]):
+        raise ValueError("CRITICAL: Database environment variables are missing. Check .env or container configuration.")
     
+    db_url = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     # 3. Create the Engine with production safety guards
     engine = create_engine(
         db_url,
